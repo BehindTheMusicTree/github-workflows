@@ -54,6 +54,24 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Changed
+
+- **Configuration Check**: Replaced script-based validation with inline bash in workflow
+  - Workflow now validates required secrets/variables directly without requiring script file
+  - Fixes issue where script was unavailable when workflow called from other repositories
+  - Removed dependency on `checkout` action in check-required-config job
+- **Webhook Secret**: Renamed `TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET` to `REDEPLOYMENT_WEBHOOK_SECRET`
+  - More generic naming that works across environments
+  - Updated workflow and documentation to reflect new name
+
+### Documentation
+
+- **README**: Clarified secret and variable configuration
+  - Added note that this repository doesn't need secrets/variables configured
+  - Updated guidance to recommend repository-level secrets by default
+  - Clarified that calling repositories must configure secrets/variables
+  - Improved setup instructions with clearer organization vs repository level guidance
+
 ## [0.1.0] - 2025-02-01
 
 ### Added

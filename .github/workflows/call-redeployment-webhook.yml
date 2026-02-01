@@ -20,14 +20,25 @@ jobs:
     environment:
       name: ${{ inputs.env }}
     steps:
-      - uses: actions/checkout@v4
       - name: Check required vars and secrets
         env:
           DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           REDEPLOYMENT_HOOK_ID: ${{ secrets.REDEPLOYMENT_HOOK_ID }}
           REDEPLOYMENT_WEBHOOK_SECRET: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET }}
-        run: bash .github/scripts/check-required-config.sh v:DOMAIN_NAME s:REDEPLOYMENT_WEBHOOK_PORT s:REDEPLOYMENT_HOOK_ID s:REDEPLOYMENT_WEBHOOK_SECRET
+        run: |
+          missing=""
+          [[ -z "$DOMAIN_NAME" ]] && missing="${missing} DOMAIN_NAME (variable)"
+          [[ -z "$REDEPLOYMENT_WEBHOOK_PORT" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT (secret)"
+          [[ -z "$REDEPLOYMENT_HOOK_ID" ]] && missing="${missing} REDEPLOYMENT_HOOK_ID (secret)"
+          [[ -z "$REDEPLOYMENT_WEBHOOK_SECRET" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET (secret)"
+          if [[ -n "$missing" ]]; then
+            echo "ERROR: Missing required config:$missing"
+            echo "Set variables and secrets in Settings → Environments (or org/repo level). See README."
+            exit 1
+          fi
+          echo "All required vars and secrets are set."
+        shell: bash
 
   call_webhook:
     name: "Call Redeploy Webhook"
