@@ -1,0 +1,75 @@
+name: "Redeploy Webhook Call"
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment (e.g. TEST)"
+        required: true
+        type: string
+        default: "TEST"
+  workflow_call:
+    inputs:
+      env:
+        required: true
+        type: string
+
+jobs:
+  check-required-config:
+    name: Check required vars and secrets
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required vars and secrets
+        env:
+          DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
+          REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
+          REDEPLOYMENT_HOOK_ID: ${{ secrets.REDEPLOYMENT_HOOK_ID }}
+          TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET: ${{ secrets.TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET }}
+        run: bash .github/scripts/check-required-config.sh v:DOMAIN_NAME s:REDEPLOYMENT_WEBHOOK_PORT s:REDEPLOYMENT_HOOK_ID s:TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET
+
+  call_webhook:
+    name: "Call Redeploy Webhook"
+    runs-on: ubuntu-latest
+    needs: [check-required-config]
+    environment:
+      name: ${{ inputs.env }}
+    steps:
+      - name: Verify environment is TEST
+        run: |
+          if [[ "${{ inputs.env }}" != "TEST" ]]; then
+            echo "ERROR: Environment must be 'test' to proceed."
+            exit 1
+          fi
+        shell: bash
+
+      - name: Call redeploy webhook
+        env:
+          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.DOMAIN_NAME }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ secrets.REDEPLOYMENT_HOOK_ID }}
+        run: |
+          set +e
+          response=$(curl -s -w '\n%{http_code}' -v \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Secret: ${{ secrets.TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET }}" \
+            -d '{}' \
+            --max-time 15 \
+            "${{ env.SERVER_REDEPLOYMENT_WEBHOOK_URL }}")
+          curl_exit=$?
+          set -e
+          if [[ $curl_exit -ne 0 ]]; then
+            echo "Webhook call failed (curl exit $curl_exit)."
+            echo "Exit 7 = connection refused: nothing listening on host:port, or firewall blocking. Check webhook service on server (systemctl status webhook), port in REDEPLOYMENT_WEBHOOK_PORT, and firewall."
+            exit 1
+          fi
+          http_code=$(echo "$response" | tail -n1)
+          response=$(echo "$response" | sed '$d')
+          if [[ "$response" != "Redeploying BTMT ecosystem" ]]; then
+            echo "ERROR: Webhook call failed with response: $response"
+            if [[ "$response" == "Hook not found." ]] || [[ "$http_code" == "404" ]]; then
+              echo "REDEPLOYMENT_HOOK_ID must match the hook id in hooks.json (path is /hooks/<id>)."
+            fi
+            exit 1
+          fi
+        shell: bash
