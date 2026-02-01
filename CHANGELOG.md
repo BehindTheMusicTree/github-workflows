@@ -64,6 +64,12 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
   - More generic naming that works across environments
   - Updated workflow and documentation to reflect new name
 
+### Removed
+
+- **Configuration Check Script**: Removed `.github/scripts/check-required-config.sh`
+  - No longer needed since validation is now inline in the workflow
+  - Script was not accessible when workflow called from other repositories
+
 ### Documentation
 
 - **README**: Clarified secret and variable configuration

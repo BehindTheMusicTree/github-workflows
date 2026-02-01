@@ -134,13 +134,11 @@ We use **GitHub Flow**: one main branch (`main`) and topic branches. No `develop
 ### 2. Developing
 
 - **Workflows:** Edit YAML in `.github/workflows/` (e.g. `call-redeployment-webhook.yml`). Ensure required vars and secrets are documented in README.
-- **Scripts:** Helper scripts for workflows live in `.github/scripts/` (e.g. `check-required-config.sh`). Keep them portable and avoid hardcoded paths (use env vars where appropriate).
 - **Docs:** Update [README.md](README.md) or [CHANGELOG.md](CHANGELOG.md) when you change behavior or add setup steps.
 
 ### 3. Testing
 
 - **Workflows:** If you have access to a test environment, run the reusable workflow from a calling repository and confirm jobs succeed. Otherwise, ensure YAML is valid and steps are consistent with README/docs.
-- **Scripts:** Run any modified scripts locally if possible (e.g. test `check-required-config.sh` with various inputs, or syntax-check with `bash -n script.sh`).
 - **Docs:** Proofread and check that links and secret/variable names match the codebase.
 
 ### 4. Committing
