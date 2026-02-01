@@ -26,8 +26,8 @@ jobs:
           DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           REDEPLOYMENT_HOOK_ID: ${{ secrets.REDEPLOYMENT_HOOK_ID }}
-          TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET: ${{ secrets.TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET }}
-        run: bash .github/scripts/check-required-config.sh v:DOMAIN_NAME s:REDEPLOYMENT_WEBHOOK_PORT s:REDEPLOYMENT_HOOK_ID s:TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET
+          REDEPLOYMENT_WEBHOOK_SECRET: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET }}
+        run: bash .github/scripts/check-required-config.sh v:DOMAIN_NAME s:REDEPLOYMENT_WEBHOOK_PORT s:REDEPLOYMENT_HOOK_ID s:REDEPLOYMENT_WEBHOOK_SECRET
 
   call_webhook:
     name: "Call Redeploy Webhook"
@@ -52,7 +52,7 @@ jobs:
           response=$(curl -s -w '\n%{http_code}' -v \
             -X POST \
             -H "Content-Type: application/json" \
-            -H "X-Secret: ${{ secrets.TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET }}" \
+            -H "X-Secret: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET }}" \
             -d '{}' \
             --max-time 15 \
             "${{ env.SERVER_REDEPLOYMENT_WEBHOOK_URL }}")

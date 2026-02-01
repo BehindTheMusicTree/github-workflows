@@ -81,15 +81,19 @@ jobs:
 
 ## Required Configuration
 
-The calling repository must configure the following secrets and variables in their GitHub repository settings (or organization settings) under the environment specified (e.g., `TEST`).
+**Note:** This repository (`github-workflows`) does not need any secrets or variables configured. It only contains the reusable workflow definition.
+
+Each repository that **calls** this reusable workflow must configure the following secrets and variables in their GitHub repository settings (or organization settings) under the environment specified (e.g., `TEST`).
+
+**Recommendation:** Since different repositories may deploy to different servers, configure these as **repository-level** secrets and variables by default. Use organization-level secrets/variables only if all repositories in your organization deploy to the same server/environment with identical configuration.
 
 ### Secrets
 
-| Secret Name                               | Description                                                              | Example             |
-| ----------------------------------------- | ------------------------------------------------------------------------ | ------------------- |
-| `REDEPLOYMENT_WEBHOOK_PORT`               | Port the webhook service listens on                                      | `9000`              |
-| `REDEPLOYMENT_HOOK_ID`                    | Hook ID used in hooks.json and as path `/hooks/<id>` for the webhook URL | `bodzify-redeploy`  |
-| `TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET` | Secret for webhook authentication (X-Secret header)                      | `your-secret-token` |
+| Secret Name                   | Description                                                              | Example             |
+| ----------------------------- | ------------------------------------------------------------------------ | ------------------- |
+| `REDEPLOYMENT_WEBHOOK_PORT`   | Port the webhook service listens on                                      | `9000`              |
+| `REDEPLOYMENT_HOOK_ID`        | Hook ID used in hooks.json and as path `/hooks/<id>` for the webhook URL | `bodzify-redeploy`  |
+| `REDEPLOYMENT_WEBHOOK_SECRET` | Secret for webhook authentication (X-Secret header)                      | `your-secret-token` |
 
 ### Variables
 
@@ -101,11 +105,12 @@ The calling repository must configure the following secrets and variables in the
 
 ### 1. Configure Secrets and Variables
 
-In your calling repository:
+In each repository that calls this workflow, configure these secrets and variables at the **repository** level under the environment (e.g., `TEST`):
 
-1. Go to **Settings** → **Environments** → **TEST** (or create the environment if it doesn't exist)
-2. Add the required secrets listed above
-3. Add the required variables listed above
+1. Go to your repository → **Settings** → **Environments** → **TEST** (or create it)
+2. Add the required secrets and variables listed above
+
+**Note:** If all repositories in your organization deploy to the same server, you can configure these at the **organization** level instead. Organization-level secrets/variables are inherited by all repositories, but repository-level settings override organization-level settings.
 
 ### 2. Add the Workflow Call
 
@@ -189,7 +194,7 @@ The URL would be: `http://example.com:9000/hooks/bodzify-redeploy`
 - Verify the webhook service is running on the server
 - Check that the port is correct and accessible
 - Ensure the hook ID matches what's configured in `hooks.json` on the server
-- Verify the webhook secret matches `TEST_SERVER_REDEPLOYMENT_WEBHOOK_SECRET`
+- Verify the webhook secret matches `REDEPLOYMENT_WEBHOOK_SECRET`
 
 ### "Connection refused" Error
 
