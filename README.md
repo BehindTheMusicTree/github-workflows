@@ -89,11 +89,11 @@ Each repository that **calls** this reusable workflow must configure the followi
 
 ### Secrets
 
-| Secret Name                   | Description                                                              | Example             |
-| ----------------------------- | ------------------------------------------------------------------------ | ------------------- |
-| `REDEPLOYMENT_WEBHOOK_PORT`   | Port the webhook service listens on                                      | `9000`              |
-| `REDEPLOYMENT_HOOK_ID`        | Hook ID used in hooks.json and as path `/hooks/<id>` for the webhook URL | `bodzify-redeploy`  |
-| `REDEPLOYMENT_WEBHOOK_SECRET` | Secret for webhook authentication (X-Secret header)                      | `your-secret-token` |
+| Secret Name                   | Description                                                              | Example              |
+| ----------------------------- | ------------------------------------------------------------------------ | -------------------- |
+| `REDEPLOYMENT_WEBHOOK_PORT`   | Port the webhook service listens on                                      | `9000`               |
+| `REDEPLOYMENT_HOOK_ID`        | Hook ID used in hooks.json and as path `/hooks/<id>` for the webhook URL | `ecosystem-redeploy` |
+| `REDEPLOYMENT_WEBHOOK_SECRET` | Secret for webhook authentication (X-Secret header)                      | `your-secret-token`  |
 
 ### Variables
 
@@ -171,9 +171,35 @@ For example, with:
 
 - `DOMAIN_NAME`: `example.com`
 - `REDEPLOYMENT_WEBHOOK_PORT`: `9000`
-- `REDEPLOYMENT_HOOK_ID`: `bodzify-redeploy`
+- `REDEPLOYMENT_HOOK_ID`: `ecosystem-redeploy`
 
-The URL would be: `http://example.com:9000/hooks/bodzify-redeploy`
+The URL would be: `http://example.com:9000/hooks/ecosystem-redeploy`
+
+### Manual Webhook Call Example
+
+You can test the webhook manually using `curl`:
+
+```bash
+curl -v \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "X-Secret: your-webhook-secret" \
+  -d '{}' \
+  --max-time 15 \
+  http://example.com:9000/hooks/ecosystem-redeploy
+```
+
+Expected response:
+
+```
+Redeploying BTMT ecosystem
+```
+
+Replace:
+
+- `your-webhook-secret` with your actual `REDEPLOYMENT_WEBHOOK_SECRET` value
+- `example.com:9000` with your `DOMAIN_NAME` and `REDEPLOYMENT_WEBHOOK_PORT`
+- `ecosystem-redeploy` with your `REDEPLOYMENT_HOOK_ID`
 
 ## Troubleshooting
 

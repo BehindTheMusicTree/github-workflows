@@ -77,6 +77,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
   - Updated guidance to recommend repository-level secrets by default
   - Clarified that calling repositories must configure secrets/variables
   - Improved setup instructions with clearer organization vs repository level guidance
+  - Added manual webhook call example with curl command for testing
 
 ## [0.1.0] - 2025-02-01
 
