@@ -54,6 +54,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+- **Webhook ID**: REDEPLOYMENT_HOOK_ID is no longer a secret but now a var
+
+## [0.1.1] - 2025-02-17
+
 ### Changed
 
 - **Configuration Check**: Replaced script-based validation with inline bash in workflow
