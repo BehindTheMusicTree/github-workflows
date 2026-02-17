@@ -1,0 +1,49 @@
+# Reusable workflow: upload partial docker-compose files to the server compose dir.
+# Caller must upload an artifact named "compose-parts" containing the partial compose file(s).
+# All files are uploaded to $WEBHOOK_DIR + $WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE + "-" + env + "/" + $DOCKER_COMPOSE_DIR_NAME + "/".
+# Vars: WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, DOCKER_COMPOSE_DIR_NAME, DOMAIN_NAME. Secrets: SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
+name: Deploy Partial Docker Compose
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: "Environment (test or prod, lowercase)"
+        required: true
+        type: string
+      app_version:
+        description: "App version (for logging; optional)"
+        required: false
+        type: string
+        default: ""
+      artifact_name:
+        description: "Artifact name containing the compose part files"
+        required: false
+        type: string
+        default: "compose-parts"
+
+jobs:
+  upload-compose-parts:
+    name: Upload partial compose files
+    runs-on: ubuntu-latest
+    env:
+      SERVER_DOCKER_COMPOSE_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/${{ vars.DOCKER_COMPOSE_DIR_NAME }}/
+      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DOMAIN_NAME }}
+    steps:
+      - name: Download compose parts artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.DOMAIN_NAME }} >> ~/.ssh/known_hosts
+
+      - name: Upload partial compose files to server
+        run: |
+          scp ./* ${{ env.SSH_DESTINATION }}:${{ env.SERVER_DOCKER_COMPOSE_DIR }}

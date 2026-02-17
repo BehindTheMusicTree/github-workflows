@@ -1,0 +1,49 @@
+# Reusable workflow: upload compose env files to pool/compose/<app_name>/.
+# Caller must upload an artifact named "app-env-files" that is a directory of env files (any names).
+# All files are uploaded to pool/compose/<app_name>/.
+# Vars: WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, DOMAIN_NAME. Secrets: SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
+name: Deploy App Env Files
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: "Environment (test or prod, lowercase)"
+        required: true
+        type: string
+      app_name:
+        description: "App name, used as subdir under pool/compose/ (e.g. htmt-api)"
+        required: true
+        type: string
+      artifact_name:
+        description: "Artifact name containing the env files directory"
+        required: false
+        type: string
+        default: "app-env-files"
+
+jobs:
+  upload-app-env:
+    name: Upload app env files
+    runs-on: ubuntu-latest
+    env:
+      POOL_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/pool
+      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DOMAIN_NAME }}
+    steps:
+      - name: Download app env files artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.DOMAIN_NAME }} >> ~/.ssh/known_hosts
+
+      - name: Ensure pool/compose subdir and upload env files
+        run: |
+          ssh $SSH_DESTINATION "mkdir -p $POOL_DIR/compose/${{ inputs.app_name }}"
+          scp -r ./* $SSH_DESTINATION:$POOL_DIR/compose/${{ inputs.app_name }}/
