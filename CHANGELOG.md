@@ -59,6 +59,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 - **Redeploy Webhook**: Env-specific secrets and hook path
   - Use `REDEPLOYMENT_WEBHOOK_SECRET_TEST` / `REDEPLOYMENT_WEBHOOK_SECRET_PROD` per env (test/prod)
   - Webhook URL path is `/hooks/$REDEPLOYMENT_HOOK_ID_BASE-$env` (e.g. `.../hooks/myhook-test`)
+  - Added reusable workflows for env and docker compose doployments
 
 - **Webhook ID**: REDEPLOYMENT_HOOK_ID is no longer a secret but now a var
 
