@@ -57,7 +57,7 @@ jobs:
 
       - name: Call redeploy webhook
         env:
-          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.DOMAIN_NAME }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID }}
+          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.DOMAIN_NAME }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
         run: |
           set +e
           response=$(curl -s -w '\n%{http_code}' -v \
