@@ -3,10 +3,10 @@ on:
   workflow_dispatch:
     inputs:
       env:
-        description: "Environment (e.g. TEST)"
+        description: "Environment (e.g. test)"
         required: true
         type: string
-        default: "TEST"
+        default: "test"
   workflow_call:
     inputs:
       env:
@@ -20,19 +20,23 @@ jobs:
     environment:
       name: ${{ inputs.env }}
     steps:
+      - name: Validate env
+        run: |
+          if [[ "${{ inputs.env }}" != "test" && "${{ inputs.env }}" != "prod" ]]; then
+            echo "ERROR: env must be 'test' or 'prod' (got: ${{ inputs.env }})"
+            exit 1
+          fi
+        shell: bash
+
       - name: Check required vars and secrets
         env:
           ENV: ${{ inputs.env }}
           DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           REDEPLOYMENT_HOOK_ID_BASE: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
-          REDEPLOYMENT_WEBHOOK_SECRET: ${{ inputs.env == 'TEST' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (inputs.env == 'PROD' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
+          REDEPLOYMENT_WEBHOOK_SECRET: ${{ inputs.env == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (inputs.env == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
         run: |
           missing=""
-          if [[ "$ENV" != "TEST" && "$ENV" != "PROD" ]]; then
-            echo "ERROR: env must be TEST or PROD (got: $ENV)"
-            exit 1
-          fi
           [[ -z "$DOMAIN_NAME" ]] && missing="${missing} DOMAIN_NAME"
           [[ -z "$REDEPLOYMENT_WEBHOOK_PORT" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT"
           [[ -z "$REDEPLOYMENT_HOOK_ID_BASE" ]] && missing="${missing} REDEPLOYMENT_HOOK_ID_BASE"
@@ -55,7 +59,7 @@ jobs:
       - name: Call redeploy webhook
         env:
           SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.DOMAIN_NAME }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}-${{ inputs.env }}
-          REDEPLOYMENT_WEBHOOK_SECRET: ${{ inputs.env == 'TEST' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (inputs.env == 'PROD' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
+          REDEPLOYMENT_WEBHOOK_SECRET: ${{ inputs.env == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (inputs.env == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
         run: |
           set +e
           response=$(curl -s -w '\n%{http_code}' -v \

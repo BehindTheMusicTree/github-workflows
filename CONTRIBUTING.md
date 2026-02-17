@@ -146,7 +146,7 @@ We use **GitHub Flow**: one main branch (`main`) and topic branches. No `develop
 - Use **concise** commit messages with a **type prefix** (e.g. `feat:`, `fix:`, `docs:`, `chore:`).
 - Prefer one logical change per commit; use multiple commits in a PR if it helps review.
 - Examples:
-  - `feat: add PROD environment support to redeploy webhook`
+  - `feat: add prod environment support to redeploy webhook`
   - `docs: add webhook call vars/secrets reference`
   - `fix: handle empty variable values in config check`
   - `chore: align changelog Unreleased`
@@ -175,7 +175,7 @@ Before submitting a Pull Request:
 
 #### 5.2. Opening a Pull Request
 
-- **Title:** Short, imperative; **always use a type prefix** (`feat:`, `fix:`, `docs:`, `chore:`), same as commit messages (e.g. `feat: add PROD environment support`, `docs: document webhook vars and secrets`).
+- **Title:** Short, imperative; **always use a type prefix** (`feat:`, `fix:`, `docs:`, `chore:`), same as commit messages (e.g. `feat: add prod environment support`, `docs: document webhook vars and secrets`).
 - **Description:** What changed and why; link related issues if any.
 - **Target:** Branch should target `main`.
 

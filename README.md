@@ -53,7 +53,7 @@ jobs:
     name: Call Redeployment Webhook
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
-      env: "TEST"
+      env: "test"
     secrets: inherit
 ```
 
@@ -75,7 +75,7 @@ jobs:
     needs: [build-and-push]
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
-      env: "TEST"
+      env: "test"
     secrets: inherit
 ```
 
@@ -83,7 +83,7 @@ jobs:
 
 **Note:** This repository (`github-workflows`) does not need any secrets or variables configured. It only contains the reusable workflow definition.
 
-Each repository that **calls** this reusable workflow must configure the following secrets and variables in their GitHub repository settings (or organization settings) under the environment specified (e.g., `TEST`).
+Each repository that **calls** this reusable workflow must configure the following secrets and variables in their GitHub repository settings (or organization settings) under the environment specified (e.g., `test`).
 
 **Recommendation:** Since different repositories may deploy to different servers, configure these as **repository-level** secrets and variables by default. Use organization-level secrets/variables only if all repositories in your organization deploy to the same server/environment with identical configuration.
 
@@ -105,9 +105,9 @@ Each repository that **calls** this reusable workflow must configure the followi
 
 ### 1. Configure Secrets and Variables
 
-In each repository that calls this workflow, configure these secrets and variables at the **repository** level under the environment (e.g., `TEST`):
+In each repository that calls this workflow, configure these secrets and variables at the **repository** level under the environment (e.g., `test`):
 
-1. Go to your repository → **Settings** → **Environments** → **TEST** (or create it)
+1. Go to your repository → **Settings** → **Environments** → **test** (or create it)
 2. Add the required secrets and variables listed above
 
 **Note:** If all repositories in your organization deploy to the same server, you can configure these at the **organization** level instead. Organization-level secrets/variables are inherited by all repositories, but repository-level settings override organization-level settings.
@@ -122,7 +122,7 @@ jobs:
     name: Call Redeployment Webhook
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
-      env: "TEST"
+      env: "test"
     secrets: inherit
 ```
 
@@ -138,7 +138,7 @@ Ensure your repository has access to use reusable workflows:
 The workflow performs the following steps:
 
 1. **Check Required Configuration**: Validates that all required secrets and variables are set
-2. **Verify Environment**: Ensures the environment is set to `TEST` (currently only TEST is supported)
+2. **Verify Environment**: Ensures the environment is set to `test` (currently only test is supported)
 3. **Call Webhook**: Sends a POST request to the webhook endpoint with authentication
 4. **Validate Response**: Verifies the webhook response matches expected output
 
@@ -154,7 +154,7 @@ The webhook endpoint should return:
 The workflow will fail with clear error messages if:
 
 - Required secrets/variables are missing
-- Environment is not `TEST`
+- Environment is not `test`
 - Webhook endpoint is unreachable (connection refused)
 - Webhook returns an unexpected response
 - Hook ID is not found (404 error)
@@ -213,7 +213,7 @@ Replace:
 
 - Verify all required secrets are set in your environment
 - Verify all required variables are set in your environment
-- Check that the environment name matches (e.g., `TEST`)
+- Check that the environment name matches (e.g., `test`)
 
 ### "Webhook call failed" Error
 

@@ -36,7 +36,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Added
 
-- **Redeployment Webhook**: Added support for PROD environment
+- **Redeployment Webhook**: Added support for prod environment
   - New environment input validation and webhook URL construction
 
 ### Fixed
@@ -53,6 +53,12 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 **Note:** During releases, maintainers will move entries from `[Unreleased]` to a versioned section (e.g., `## [0.2.0] - 2025-02-XX`).
 
 ## [Unreleased]
+
+### Changed
+
+- **Redeploy Webhook**: Env-specific secrets and hook path
+  - Use `REDEPLOYMENT_WEBHOOK_SECRET_TEST` / `REDEPLOYMENT_WEBHOOK_SECRET_PROD` per env (test/prod)
+  - Webhook URL path is `/hooks/$REDEPLOYMENT_HOOK_ID_BASE-$env` (e.g. `.../hooks/myhook-test`)
 
 - **Webhook ID**: REDEPLOYMENT_HOOK_ID is no longer a secret but now a var
 
@@ -90,7 +96,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 - **Call Redeployment Webhook Workflow**: Reusable GitHub Actions workflow for triggering server redeployment webhooks
   - Supports both `workflow_dispatch` (manual trigger) and `workflow_call` (reusable workflow)
   - Validates required configuration (secrets and variables) before proceeding
-  - Verifies environment is set to `TEST` (currently only TEST environment supported)
+  - Verifies environment is set to `test` (currently only test environment supported)
   - Calls redeployment webhook endpoint with authentication
   - Validates webhook response matches expected output
   - Provides clear error messages for common failure scenarios
