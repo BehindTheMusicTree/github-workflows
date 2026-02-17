@@ -1,6 +1,6 @@
 # Reusable workflow: upload nginx env fragment to pool/nginx.
 # Caller must upload an artifact named "nginx-env-fragment" containing one file (the fragment).
-# That file is uploaded to pool/nginx/<nginx_env_fragment_filename>.
+# That file is uploaded to pool/nginx/<app_name>.env.
 # Vars: WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, DOMAIN_NAME. Secrets: SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
 name: Deploy Nginx Env Fragment
 
@@ -11,8 +11,8 @@ on:
         description: "Environment (test or prod, lowercase)"
         required: true
         type: string
-      nginx_env_fragment_filename:
-        description: "Filename under pool/nginx/ (e.g. htmt-api.env)"
+      app_name:
+        description: "App name; fragment is uploaded as pool/nginx/<app_name>.env"
         required: true
         type: string
       artifact_name:
@@ -25,8 +25,6 @@ jobs:
   upload-nginx-env:
     name: Upload nginx env fragment
     runs-on: ubuntu-latest
-    environment:
-      name: TEST
     env:
       POOL_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/pool
       SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DOMAIN_NAME }}
@@ -41,7 +39,7 @@ jobs:
           set -e
           count=$(find . -type f | wc -l)
           [ "$count" -eq 1 ] || { echo "Expected exactly one file in artifact, got $count"; exit 1; }
-          frag="${{ inputs.nginx_env_fragment_filename }}"
+          frag="${{ inputs.app_name }}.env"
           cp "$(find . -type f)" "$frag"
 
       - uses: webfactory/ssh-agent@v0.9.0
@@ -56,4 +54,4 @@ jobs:
       - name: Ensure pool/nginx and upload fragment
         run: |
           ssh ${{ env.SSH_DESTINATION }} "mkdir -p ${{ env.POOL_DIR }}/nginx"
-          scp ${{ inputs.nginx_env_fragment_filename }} ${{ env.SSH_DESTINATION }}:${{ env.POOL_DIR }}/nginx/
+          scp "${{ inputs.app_name }}.env" ${{ env.SSH_DESTINATION }}:${{ env.POOL_DIR }}/nginx/
