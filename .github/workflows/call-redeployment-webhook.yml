@@ -24,7 +24,7 @@ jobs:
         env:
           DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
-          REDEPLOYMENT_HOOK_ID: ${{ vars.REDEPLOYMENT_HOOK_ID }}
+          REDEPLOYMENT_HOOK_ID: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
           REDEPLOYMENT_WEBHOOK_SECRET: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET }}
         run: |
           missing=""
