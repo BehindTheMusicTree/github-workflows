@@ -28,10 +28,10 @@ jobs:
           REDEPLOYMENT_WEBHOOK_SECRET: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET }}
         run: |
           missing=""
-          [[ -z "$DOMAIN_NAME" ]] && missing="${missing} DOMAIN_NAME (variable)"
-          [[ -z "$REDEPLOYMENT_WEBHOOK_PORT" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT (secret)"
-          [[ -z "$REDEPLOYMENT_HOOK_ID" ]] && missing="${missing} REDEPLOYMENT_HOOK_ID (secret)"
-          [[ -z "$REDEPLOYMENT_WEBHOOK_SECRET" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET (secret)"
+          [[ -z "$DOMAIN_NAME" ]] && missing="${missing} DOMAIN_NAME"
+          [[ -z "$REDEPLOYMENT_WEBHOOK_PORT" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT"
+          [[ -z "$REDEPLOYMENT_HOOK_ID" ]] && missing="${missing} REDEPLOYMENT_HOOK_ID"
+          [[ -z "$REDEPLOYMENT_WEBHOOK_SECRET" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET"
           if [[ -n "$missing" ]]; then
             echo "ERROR: Missing required config:$missing"
             echo "Set variables and secrets in Settings → Environments (or org/repo level). See README."
