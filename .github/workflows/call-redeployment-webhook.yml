@@ -22,16 +22,21 @@ jobs:
     steps:
       - name: Check required vars and secrets
         env:
+          ENV: ${{ inputs.env }}
           DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
-          REDEPLOYMENT_HOOK_ID: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
-          REDEPLOYMENT_WEBHOOK_SECRET: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET }}
+          REDEPLOYMENT_HOOK_ID_BASE: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
+          REDEPLOYMENT_WEBHOOK_SECRET: ${{ inputs.env == 'TEST' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (inputs.env == 'PROD' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
         run: |
           missing=""
+          if [[ "$ENV" != "TEST" && "$ENV" != "PROD" ]]; then
+            echo "ERROR: env must be TEST or PROD (got: $ENV)"
+            exit 1
+          fi
           [[ -z "$DOMAIN_NAME" ]] && missing="${missing} DOMAIN_NAME"
           [[ -z "$REDEPLOYMENT_WEBHOOK_PORT" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT"
-          [[ -z "$REDEPLOYMENT_HOOK_ID" ]] && missing="${missing} REDEPLOYMENT_HOOK_ID"
-          [[ -z "$REDEPLOYMENT_WEBHOOK_SECRET" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET"
+          [[ -z "$REDEPLOYMENT_HOOK_ID_BASE" ]] && missing="${missing} REDEPLOYMENT_HOOK_ID_BASE"
+          [[ -z "$REDEPLOYMENT_WEBHOOK_SECRET" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET_${ENV}"
           if [[ -n "$missing" ]]; then
             echo "ERROR: Missing required config:$missing"
             echo "Set variables and secrets in Settings → Environments (or org/repo level). See README."
@@ -47,23 +52,16 @@ jobs:
     environment:
       name: ${{ inputs.env }}
     steps:
-      - name: Verify environment is TEST
-        run: |
-          if [[ "${{ inputs.env }}" != "TEST" ]]; then
-            echo "ERROR: Environment must be 'test' to proceed."
-            exit 1
-          fi
-        shell: bash
-
       - name: Call redeploy webhook
         env:
-          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.DOMAIN_NAME }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
+          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.DOMAIN_NAME }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}-${{ inputs.env }}
+          REDEPLOYMENT_WEBHOOK_SECRET: ${{ inputs.env == 'TEST' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (inputs.env == 'PROD' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
         run: |
           set +e
           response=$(curl -s -w '\n%{http_code}' -v \
             -X POST \
             -H "Content-Type: application/json" \
-            -H "X-Secret: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET }}" \
+            -H "X-Secret: $REDEPLOYMENT_WEBHOOK_SECRET" \
             -d '{}' \
             --max-time 15 \
             "${{ env.SERVER_REDEPLOYMENT_WEBHOOK_URL }}")
@@ -79,7 +77,7 @@ jobs:
           if [[ "$response" != "Redeploying BTMT ecosystem" ]]; then
             echo "ERROR: Webhook call failed with response: $response"
             if [[ "$response" == "Hook not found." ]] || [[ "$http_code" == "404" ]]; then
-              echo "REDEPLOYMENT_HOOK_ID must match the hook id in hooks.json (path is /hooks/<id>)."
+              echo "REDEPLOYMENT_HOOK_ID_BASE + '-' + env must match the hook id in hooks.json (path is /hooks/<id>-<env>)."
             fi
             exit 1
           fi
