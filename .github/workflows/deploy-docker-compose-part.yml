@@ -1,8 +1,8 @@
-# Reusable workflow: upload partial docker-compose files to the server compose dir.
-# Caller must upload an artifact named "compose-parts" containing the partial compose file(s).
-# All files are uploaded to $WEBHOOK_DIR + $WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE + "-" + env + "/" + $DOCKER_COMPOSE_DIR_NAME + "/".
+# Reusable workflow: upload compose part files to the server compose **parts** directory.
+# Caller must upload an artifact named "compose-parts" containing the compose part file(s) (.yml or .yaml).
+# Files are uploaded to $WEBHOOK_DIR + $WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE + "-" + env + "/" + $DOCKER_COMPOSE_DIR_NAME + "/parts/".
 # Vars: WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, DOCKER_COMPOSE_DIR_NAME, DOMAIN_NAME. Secrets: SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
-name: Deploy Partial Docker Compose
+name: Deploy Compose Parts
 
 on:
   workflow_call:
@@ -24,10 +24,10 @@ on:
 
 jobs:
   upload-compose-parts:
-    name: Upload partial compose files
+    name: Upload compose parts to server
     runs-on: ubuntu-latest
     env:
-      SERVER_DOCKER_COMPOSE_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/${{ vars.DOCKER_COMPOSE_DIR_NAME }}/
+      SERVER_COMPOSE_PARTS_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/${{ vars.DOCKER_COMPOSE_DIR_NAME }}/parts/
       SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DOMAIN_NAME }}
     steps:
       - name: Download compose parts artifact
@@ -51,6 +51,8 @@ jobs:
             [ -f "$f" ] && sed -i -E "s/(container_name:[[:space:]]*[\"']?)([^\"'\n]+)([\"']?)/\1\2${SUFFIX}\3/" "$f"
           done
 
-      - name: Upload partial compose files to server
+      - name: Upload compose part files to server
         run: |
-          scp ./* ${{ env.SSH_DESTINATION }}:${{ env.SERVER_DOCKER_COMPOSE_DIR }}
+          for f in *.yml *.yaml; do
+            [ -f "$f" ] && scp "$f" ${{ env.SSH_DESTINATION }}:${{ env.SERVER_COMPOSE_PARTS_DIR }}
+          done
