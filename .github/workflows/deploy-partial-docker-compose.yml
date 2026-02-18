@@ -44,6 +44,13 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ vars.DOMAIN_NAME }} >> ~/.ssh/known_hosts
 
+      - name: Add suffix -${{ inputs.env }} to container_name in compose files
+        run: |
+          SUFFIX='-${{ inputs.env }}'
+          for f in *.yml *.yaml; do
+            [ -f "$f" ] && sed -i -E "s/(container_name:[[:space:]]*[\"']?)([^\"'\n]+)([\"']?)/\1\2${SUFFIX}\3/" "$f"
+          done
+
       - name: Upload partial compose files to server
         run: |
           scp ./* ${{ env.SSH_DESTINATION }}:${{ env.SERVER_DOCKER_COMPOSE_DIR }}
