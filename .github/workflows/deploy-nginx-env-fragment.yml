@@ -26,7 +26,7 @@ jobs:
     name: Upload nginx env fragment
     runs-on: ubuntu-latest
     env:
-      POOL_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/pool
+      POOL_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/pool/
       SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DOMAIN_NAME }}
     steps:
       - name: Download nginx env fragment artifact
@@ -53,5 +53,5 @@ jobs:
 
       - name: Ensure pool/nginx and upload fragment
         run: |
-          ssh ${{ env.SSH_DESTINATION }} "mkdir -p ${{ env.POOL_DIR }}/nginx"
-          scp "${{ inputs.app_name }}.env" ${{ env.SSH_DESTINATION }}:${{ env.POOL_DIR }}/nginx/
+          ssh ${{ env.SSH_DESTINATION }} "mkdir -p ${{ env.POOL_DIR }}nginx"
+          scp "${{ inputs.app_name }}.env" ${{ env.SSH_DESTINATION }}:${{ env.POOL_DIR }}nginx/

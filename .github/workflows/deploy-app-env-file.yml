@@ -30,7 +30,7 @@ jobs:
     name: Upload app env files
     runs-on: ubuntu-latest
     env:
-      POOL_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/pool
+      POOL_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/pool/
       SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DOMAIN_NAME }}
     steps:
       - name: Download app env files artifact
@@ -56,11 +56,11 @@ jobs:
 
       - name: Ensure pool/compose subdir and upload env files
         run: |
-          ssh $SSH_DESTINATION "mkdir -p $POOL_DIR/compose/${{ inputs.app_name }}"
+          ssh ${{ env.SSH_DESTINATION }} "mkdir -p ${{ env.POOL_DIR }}compose/${{ inputs.app_name }}"
           shopt -s dotglob
           files=(*)
           if [ ${#files[@]} -eq 0 ] || [ "${files[0]}" = '*' ]; then
             echo "ERROR: No env files to upload."
             exit 1
           fi
-          scp -r "${files[@]}" $SSH_DESTINATION:$POOL_DIR/compose/${{ inputs.app_name }}/
+          scp -r "${files[@]}" ${{ env.SSH_DESTINATION }}:${{ env.POOL_DIR }}compose/${{ inputs.app_name }}/
