@@ -57,4 +57,10 @@ jobs:
       - name: Ensure pool/compose subdir and upload env files
         run: |
           ssh $SSH_DESTINATION "mkdir -p $POOL_DIR/compose/${{ inputs.app_name }}"
-          scp -r ./* $SSH_DESTINATION:$POOL_DIR/compose/${{ inputs.app_name }}/
+          shopt -s dotglob
+          files=(*)
+          if [ ${#files[@]} -eq 0 ] || [ "${files[0]}" = '*' ]; then
+            echo "ERROR: No env files to upload."
+            exit 1
+          fi
+          scp -r "${files[@]}" $SSH_DESTINATION:$POOL_DIR/compose/${{ inputs.app_name }}/
