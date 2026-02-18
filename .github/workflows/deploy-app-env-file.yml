@@ -1,6 +1,10 @@
 # Reusable workflow: upload compose env files to pool/compose/<app_name>/.
-# Caller must upload an artifact named "app-env-files" that is a directory of env files (any names).
-# All files are uploaded to pool/compose/<app_name>/.
+# Caller must upload an artifact (e.g. "app-env-files") that is a directory of env files.
+#
+# Dotfile issue: actions/upload-artifact can exclude hidden files (names starting with ".").
+# Callers must use non-dotfile names in the artifact (e.g. env_api, env_db, env_afp, not .env_api).
+# This workflow renames them to dotfiles (env_api -> .env_api) before uploading to the server.
+#
 # Vars: WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, DOMAIN_NAME. Secrets: SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
 name: Deploy App Env Files
 
@@ -33,6 +37,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.artifact_name }}
+
+      # Rename non-dotfiles to dotfiles (caller used env_api etc. so upload-artifact included them)
+      - name: Restore dotfile names for server
+        run: |
+          for f in *; do
+            [ -f "$f" ] && [ ! -e ".$f" ] && mv "$f" ".$f"
+          done
 
       - uses: webfactory/ssh-agent@v0.9.0
         with:
