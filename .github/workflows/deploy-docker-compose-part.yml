@@ -44,21 +44,6 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ vars.DOMAIN_NAME }} >> ~/.ssh/known_hosts
 
-      - name: Add suffix -${{ inputs.env }} to container_name in compose files
-        run: |
-          SUFFIX='-${{ inputs.env }}'
-          count=0
-          for f in *.yml *.yaml; do
-            if [ -f "$f" ]; then
-              sed -i -E "s/(container_name:[[:space:]]*[\"']?)([^\"'\n]+)([\"']?)/\1\2${SUFFIX}\3/" "$f"
-              count=$((count + 1))
-            fi
-          done
-          if [ "$count" -eq 0 ]; then
-            echo "ERROR: No .yml or .yaml compose files found in artifact. Expected at least one."
-            exit 1
-          fi
-
       - name: Upload compose part files to server
         run: |
           for f in *.yml *.yaml; do
