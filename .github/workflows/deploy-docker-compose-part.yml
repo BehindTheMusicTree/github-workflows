@@ -46,8 +46,10 @@ jobs:
 
       - name: Upload compose part files to server
         run: |
+          DEST="${{ env.SERVER_COMPOSE_PARTS_DIR }}"
           for f in *.yml *.yaml; do
             if [ -f "$f" ]; then
-              scp "$f" ${{ env.SSH_DESTINATION }}:${{ env.SERVER_COMPOSE_PARTS_DIR }}
+              echo "Transfer: $f -> $DEST"
+              scp "$f" ${{ env.SSH_DESTINATION }}:$DEST
             fi
           done

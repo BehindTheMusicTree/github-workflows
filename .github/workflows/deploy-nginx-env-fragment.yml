@@ -53,5 +53,7 @@ jobs:
 
       - name: Ensure pool/nginx and upload fragment
         run: |
+          DEST="${{ env.POOL_DIR }}nginx/${{ inputs.app_name }}.env"
           ssh ${{ env.SSH_DESTINATION }} "mkdir -p ${{ env.POOL_DIR }}nginx"
+          echo "Transfer: ${{ inputs.app_name }}.env -> $DEST"
           scp "${{ inputs.app_name }}.env" ${{ env.SSH_DESTINATION }}:${{ env.POOL_DIR }}nginx/
