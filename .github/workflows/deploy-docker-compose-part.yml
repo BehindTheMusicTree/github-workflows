@@ -27,9 +27,13 @@ jobs:
     name: Upload compose parts to server
     runs-on: ubuntu-latest
     env:
-      SERVER_COMPOSE_PARTS_DIR: ${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${{ inputs.env }}/${{ vars.DOCKER_COMPOSE_DIR_NAME }}/parts/
       SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DOMAIN_NAME }}
     steps:
+      - name: Set path env (lowercase)
+        run: |
+          ENV_LC=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')
+          echo "ENV_LC=$ENV_LC" >> $GITHUB_ENV
+          echo "SERVER_COMPOSE_PARTS_DIR=${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${ENV_LC}/${{ vars.DOCKER_COMPOSE_DIR_NAME }}/parts/" >> $GITHUB_ENV
       - name: Download compose parts artifact
         uses: actions/download-artifact@v4
         with:
