@@ -26,32 +26,43 @@ on:
         default: "{}"
 
 jobs:
-  check-required-config:
-    name: Check required vars and secrets
+  validate-env:
+    name: Validate env
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.env }}
+    outputs:
+      env_normalized: ${{ steps.normalize.outputs.env_normalized }}
     steps:
       - name: Validate env
+        id: normalize
         run: |
           env="${{ inputs.env }}"
           if [[ -z "$env" ]]; then
             echo "ERROR: env is required (no default)."
             exit 1
           fi
-          if [[ "$env" != "test" && "$env" != "prod" ]]; then
+          env_lower=$(echo "$env" | tr '[:upper:]' '[:lower:]')
+          if [[ "$env_lower" != "test" && "$env_lower" != "prod" ]]; then
             echo "ERROR: env must be 'prod' or 'test' (got: $env)."
             exit 1
           fi
+          echo "env_normalized=$env_lower" >> "$GITHUB_OUTPUT"
         shell: bash
+
+  check-required-config:
+    name: Check required vars and secrets
+    runs-on: ubuntu-latest
+    needs: [validate-env]
+    environment:
+      name: ${{ needs.validate-env.outputs.env_normalized }}
+    steps:
 
       - name: Check required vars and secrets
         env:
-          ENV: ${{ inputs.env }}
+          ENV: ${{ needs.validate-env.outputs.env_normalized }}
           DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           REDEPLOYMENT_HOOK_ID_BASE: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
-          REDEPLOYMENT_WEBHOOK_SECRET: ${{ inputs.env == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (inputs.env == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
+          REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
         run: |
           missing=""
           [[ -z "$DOMAIN_NAME" ]] && missing="${missing} DOMAIN_NAME"
@@ -69,14 +80,14 @@ jobs:
   call_webhook:
     name: Call Redeploy Webhook
     runs-on: ubuntu-latest
-    needs: [check-required-config]
+    needs: [check-required-config, validate-env]
     environment:
-      name: ${{ inputs.env }}
+      name: ${{ needs.validate-env.outputs.env_normalized }}
     steps:
       - name: Call redeploy webhook
         env:
-          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.DOMAIN_NAME }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}-${{ inputs.env }}
-          REDEPLOYMENT_WEBHOOK_SECRET: ${{ inputs.env == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (inputs.env == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
+          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.DOMAIN_NAME }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}-${{ needs.validate-env.outputs.env_normalized }}
+          REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
           IMAGES_PAYLOAD: ${{ inputs.images }}
         run: |
           set +e
