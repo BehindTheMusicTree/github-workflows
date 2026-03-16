@@ -9,6 +9,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 ## Table of Contents
 
 - [Available Workflows](#available-workflows)
+  - [Actionlint](#actionlint)
   - [Call Redeployment Webhook](#call-redeployment-webhook)
   - [Deploy App Env File](#deploy-app-env-file)
   - [Deploy Nginx Env Fragment](#deploy-nginx-env-fragment)
@@ -30,6 +31,20 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - [License](#license)
 
 ## Available Workflows
+
+### Actionlint
+
+Runs [actionlint](https://github.com/rhysd/actionlint) on the caller repo. Uses `.github/actionlint.yaml` from the caller if present, so repo-specific ignore rules (e.g. for reusable workflow calls) apply.
+
+**Workflow file:** `.github/workflows/actionlint.yml`
+
+No inputs. Call from your repo on `push` or `pull_request`:
+
+```yaml
+jobs:
+  actionlint:
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/actionlint.yml@main
+```
 
 ### Call Redeployment Webhook
 

@@ -1,0 +1,27 @@
+# Reusable workflow: run actionlint on the caller repo with the caller's config.
+# Use this so repo-specific ignore rules (e.g. .github/actionlint.yaml) are applied.
+# Caller workflow must run on push or pull_request; this job checks out the caller repo and runs actionlint.
+name: Actionlint
+
+on:
+  workflow_call:
+
+jobs:
+  actionlint:
+    name: Actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install actionlint
+        run: |
+          VERSION="1.7.11"
+          curl -sSL "https://github.com/rhysd/actionlint/releases/download/v${VERSION}/actionlint_${VERSION}_linux_amd64.tar.gz" | tar xz -C /tmp
+
+      - name: Lint workflows
+        run: |
+          if [ -f .github/actionlint.yaml ]; then
+            /tmp/actionlint -config-file .github/actionlint.yaml
+          else
+            /tmp/actionlint
+          fi
