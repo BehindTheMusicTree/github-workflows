@@ -1,6 +1,7 @@
-# Reusable workflow: write image tag to server scripts dir for the given env.
+# Reusable workflow: write image tag to server scripts dir for the given env and service.
 # Caller must have vars WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, DOMAIN_NAME
 # and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY (same as other deploy workflows).
+# Filename on server: ${app_name}-tag (e.g. htmt-api-tag, htmt-db-tag, afp-tag).
 name: Set image tag on server
 
 on:
@@ -11,14 +12,13 @@ on:
         required: true
         type: string
       tag:
-        description: "Image tag to write (e.g. staging, 1.2.4)"
+        description: "Image tag to write (e.g. staging, 1.2.4, 16)"
         required: true
         type: string
-      service:
-        description: "Service name for filename (default htmt-api → file htmt-api-tag)"
-        required: false
+      app_name:
+        description: "Service/app name for filename (e.g. htmt-api, htmt-db, afp)"
+        required: true
         type: string
-        default: "htmt-api"
 
 jobs:
   set-tag:
@@ -42,7 +42,7 @@ jobs:
         run: |
           ENV_LC="${{ steps.validate.outputs.env_lower }}"
           SCRIPTS_DIR="${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${ENV_LC}/scripts/"
-          echo "remote_path=${SCRIPTS_DIR}${{ inputs.service }}-tag" >> $GITHUB_OUTPUT
+          echo "remote_path=${SCRIPTS_DIR}${{ inputs.app_name }}-tag" >> $GITHUB_OUTPUT
 
       - uses: webfactory/ssh-agent@v0.9.0
         with:

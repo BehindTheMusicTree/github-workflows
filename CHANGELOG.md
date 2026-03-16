@@ -54,16 +54,13 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
-### Added
-
-- **Set image tag on server**: Reusable workflow to write image tag to server scripts dir per env
-  - `workflow_call` with inputs: `env` (test/prod), `tag`, `service` (default `htmt-api`)
-  - Requires vars: `WEBHOOK_DIR`, `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE`, `DOMAIN_NAME`; secrets: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`
-  - Writes tag to `$WEBHOOK_DIR$WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE-$env/scripts/$service-tag` via SSH
-
 ### Changed
 
 - **Webhook ID**: REDEPLOYMENT_HOOK_ID is no longer a secret but now a var
+
+- **Set image tag on server**: Input renamed `service` → `app_name`, now required (no default)
+  - Callers must pass explicit service/app name (e.g. htmt-api, htmt-db, afp); filename on server is `${app_name}-tag`
+  - Updated workflow comment and tag description examples
 
 ## [0.1.1] - 2025-02-17
 
