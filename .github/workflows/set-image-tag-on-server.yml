@@ -1,0 +1,62 @@
+# Reusable workflow: write image tag to server scripts dir for the given env.
+# Caller must have vars WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, DOMAIN_NAME
+# and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY (same as other deploy workflows).
+name: Set image tag on server
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: "Environment (test or prod)"
+        required: true
+        type: string
+      tag:
+        description: "Image tag to write (e.g. staging, 1.2.4)"
+        required: true
+        type: string
+      service:
+        description: "Service name for filename (default htmt-api → file htmt-api-tag)"
+        required: false
+        type: string
+        default: "htmt-api"
+
+jobs:
+  set-tag:
+    name: Set image tag on server
+    runs-on: ubuntu-latest
+    env:
+      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DOMAIN_NAME }}
+    steps:
+      - name: Validate env
+        id: validate
+        run: |
+          env_lower=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')
+          if [[ "$env_lower" != "test" && "$env_lower" != "prod" ]]; then
+            echo "ERROR: env must be 'test' or 'prod' (got: ${{ inputs.env }})."
+            exit 1
+          fi
+          echo "env_lower=$env_lower" >> $GITHUB_OUTPUT
+
+      - name: Set remote path
+        id: path
+        run: |
+          ENV_LC="${{ steps.validate.outputs.env_lower }}"
+          SCRIPTS_DIR="${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${ENV_LC}/scripts/"
+          echo "remote_path=${SCRIPTS_DIR}${{ inputs.service }}-tag" >> $GITHUB_OUTPUT
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.DOMAIN_NAME }} >> ~/.ssh/known_hosts
+
+      - name: Write tag file on server
+        env:
+          TAG: ${{ inputs.tag }}
+          REMOTE_PATH: ${{ steps.path.outputs.remote_path }}
+        run: |
+          ssh ${{ env.SSH_DESTINATION }} "printf '%s' \"$TAG\" > \"$REMOTE_PATH\""
+          echo "Wrote tag to $REMOTE_PATH"

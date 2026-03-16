@@ -54,12 +54,14 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
-### Changed
+### Added
 
-- **Redeploy Webhook**: Env-specific secrets and hook path
-  - Use `REDEPLOYMENT_WEBHOOK_SECRET_TEST` / `REDEPLOYMENT_WEBHOOK_SECRET_PROD` per env (test/prod)
-  - Webhook URL path is `/hooks/$REDEPLOYMENT_HOOK_ID_BASE-$env` (e.g. `.../hooks/myhook-test`)
-  - Added reusable workflows for env and docker compose doployments
+- **Set image tag on server**: Reusable workflow to write image tag to server scripts dir per env
+  - `workflow_call` with inputs: `env` (test/prod), `tag`, `service` (default `htmt-api`)
+  - Requires vars: `WEBHOOK_DIR`, `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE`, `DOMAIN_NAME`; secrets: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`
+  - Writes tag to `$WEBHOOK_DIR$WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE-$env/scripts/$service-tag` via SSH
+
+### Changed
 
 - **Webhook ID**: REDEPLOYMENT_HOOK_ID is no longer a secret but now a var
 
