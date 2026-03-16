@@ -1,5 +1,5 @@
 # Reusable workflow: write image tag to server scripts dir for the given env and service.
-# Caller must have vars WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, DOMAIN_NAME
+# Caller must have vars WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, VPS_IP
 # and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY (same as other deploy workflows).
 # Filename on server: ${app_name}-tag (e.g. htmt-api-tag, htmt-db-tag, afp-tag).
 name: Set image tag on server
@@ -25,7 +25,7 @@ jobs:
     name: Set image tag on server
     runs-on: ubuntu-latest
     env:
-      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DOMAIN_NAME }}
+      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.VPS_IP }}
     steps:
       - name: Validate env
         id: validate
@@ -51,7 +51,7 @@ jobs:
       - name: Add host to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.DOMAIN_NAME }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ vars.VPS_IP }} >> ~/.ssh/known_hosts
 
       - name: Write tag file on server
         env:

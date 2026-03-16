@@ -59,13 +59,13 @@ jobs:
       - name: Check required vars and secrets
         env:
           ENV: ${{ needs.validate-env.outputs.env_normalized }}
-          DOMAIN_NAME: ${{ vars.DOMAIN_NAME }}
+          VPS_IP: ${{ vars.VPS_IP }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           REDEPLOYMENT_HOOK_ID_BASE: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
           REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
         run: |
           missing=""
-          [[ -z "$DOMAIN_NAME" ]] && missing="${missing} DOMAIN_NAME"
+          [[ -z "$VPS_IP" ]] && missing="${missing} VPS_IP"
           [[ -z "$REDEPLOYMENT_WEBHOOK_PORT" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT"
           [[ -z "$REDEPLOYMENT_HOOK_ID_BASE" ]] && missing="${missing} REDEPLOYMENT_HOOK_ID_BASE"
           [[ -z "$REDEPLOYMENT_WEBHOOK_SECRET" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET_${ENV}"
@@ -86,7 +86,7 @@ jobs:
     steps:
       - name: Call redeploy webhook
         env:
-          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.DOMAIN_NAME }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}-${{ needs.validate-env.outputs.env_normalized }}
+          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.VPS_IP }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}-${{ needs.validate-env.outputs.env_normalized }}
           REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
           IMAGES_PAYLOAD: ${{ inputs.images }}
         run: |

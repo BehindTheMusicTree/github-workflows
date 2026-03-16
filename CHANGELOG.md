@@ -56,6 +56,8 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Changed
 
+- **Webhook and SSH use VPS_IP**: call-redeployment-webhook and set-image-tag-on-server now use variable **VPS_IP** (instead of DOMAIN_NAME) for the webhook URL host and SSH destination. Use when the main domain points elsewhere (e.g. Vercel). Callers must set **VPS_IP** in the environment (repo or org variables).
+
 - **Webhook ID**: REDEPLOYMENT_HOOK_ID is no longer a secret but now a var
 
 - **Set image tag on server**: Input renamed `service` → `app_name`, now required (no default)

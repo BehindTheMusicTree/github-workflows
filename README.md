@@ -130,7 +130,7 @@ This repo only contains workflow definitions. Each repository that **calls** the
 
 | Type    | Name | Description |
 |---------|------|-------------|
-| Variable | `DOMAIN_NAME` | Server hostname or IP for webhook URL |
+| Variable | `VPS_IP` | VPS IP or hostname for webhook URL (use when main domain points elsewhere, e.g. Vercel) |
 | Variable | `REDEPLOYMENT_HOOK_ID_BASE` | Base hook id; URL path is `/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `myhook-test`) |
 | Secret  | `REDEPLOYMENT_WEBHOOK_PORT` | Port the webhook service listens on |
 | Secret  | `REDEPLOYMENT_WEBHOOK_SECRET_TEST` | Webhook secret for env `test` (X-Secret header) |
@@ -145,7 +145,7 @@ Required by **deploy-app-env-file**, **deploy-nginx-env-fragment**, and **deploy
 | Variable | `WEBHOOK_DIR` | Base dir on server (e.g. `/home/deploy/`) |
 | Variable | `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE` | Base name; pool/compose paths use `<base>-<env>` (e.g. `btmt-redeploy-test`) |
 | Variable | `DOCKER_COMPOSE_DIR_NAME` | Compose dir name under redeploy dir |
-| Variable | `DOMAIN_NAME` | Server hostname or IP for SSH |
+| Variable | `VPS_IP` | VPS IP or hostname for SSH |
 | Secret  | `SERVER_DEPLOY_USERNAME` | SSH user for deploy |
 | Secret  | `SERVER_DEPLOY_SSH_PRIVATE_KEY` | SSH private key for deploy |
 
@@ -180,20 +180,20 @@ The webhook workflow fails with clear errors if:
 
 ## Webhook Endpoint
 
-The workflow builds the URL as:
+The workflow builds the URL using **VPS_IP** (the webhook runs on the VPS; use VPS IP when the main domain points elsewhere, e.g. Vercel):
 
 ```
-http://<DOMAIN_NAME>:<REDEPLOYMENT_WEBHOOK_PORT>/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>
+http://<VPS_IP>:<REDEPLOYMENT_WEBHOOK_PORT>/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>
 ```
 
-Example: `DOMAIN_NAME=example.com`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=test`  
-→ `http://example.com:9000/hooks/btmt-redeploy-test`
+Example: `VPS_IP=203.0.113.10`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=test`  
+→ `http://203.0.113.10:9000/hooks/btmt-redeploy-test`
 
 Manual test (use the secret for the env you target):
 
 ```bash
 curl -v -X POST -H "Content-Type: application/json" -H "X-Secret: YOUR_SECRET" -d '{}' --max-time 15 \
-  http://example.com:9000/hooks/btmt-redeploy-test
+  http://<VPS_IP>:9000/hooks/btmt-redeploy-test
 ```
 
 ## Troubleshooting
