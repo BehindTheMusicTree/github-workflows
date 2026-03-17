@@ -59,7 +59,7 @@ jobs:
           echo "fragment_path=$val" >> "$GITHUB_OUTPUT"
 
       - name: Download env fragment artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7.0.0
         with:
           name: ${{ steps.fragment.outputs.artifact_name }}
 
@@ -75,7 +75,7 @@ jobs:
       - name: Upload fragment and merge into server .env (${{ inputs.sync_env }})
         env:
           SYNC_ENV: ${{ inputs.sync_env }}
-          FRAGMENT_FILE: ${{ steps.fragment.outputs.fragment_path }}
+          FRAGMENT_FILE: ${{ steps.fragment.outputs.artifact_name }}/${{ steps.fragment.outputs.fragment_path }}
         run: |
           if [ ! -f "$FRAGMENT_FILE" ]; then
             echo "ERROR: Fragment file not found: $FRAGMENT_FILE"
