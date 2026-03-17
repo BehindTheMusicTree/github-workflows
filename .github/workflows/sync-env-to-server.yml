@@ -56,7 +56,11 @@ jobs:
         run: |
           val="${{ inputs.fragment_artifact }}"
           echo "artifact_name=${val%%/*}" >> "$GITHUB_OUTPUT"
-          echo "fragment_path=$val" >> "$GITHUB_OUTPUT"
+          if [[ "$val" == */* ]]; then
+            echo "fragment_path=${val#*/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "fragment_path=$val" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download env fragment artifact
         uses: actions/download-artifact@v7.0.0
