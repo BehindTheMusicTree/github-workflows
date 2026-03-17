@@ -35,11 +35,10 @@ jobs:
           VPS_IP: ${{ vars.VPS_IP }}
           WEBHOOK_DIR: ${{ vars.WEBHOOK_DIR }}
           WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE: ${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}
-          SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE: ${{ vars.SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE }}
           SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
           SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
         run: |
-          required=(VPS_IP WEBHOOK_DIR WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
+          required=(VPS_IP WEBHOOK_DIR WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
           missing=()
           for v in "${required[@]}"; do
             [ -z "${!v}" ] && missing+=("$v")
@@ -91,7 +90,7 @@ jobs:
             echo "ERROR: Fragment file not found: $FRAGMENT_FILE"
             exit 1
           fi
-          FRAGMENT_BASE="${SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE}${APP_NAME}"
+          FRAGMENT_BASE="${SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE:-sync-env-}${APP_NAME}"
           scp -o StrictHostKeyChecking=accept-new "$FRAGMENT_FILE" "$SSH_DESTINATION:/tmp/${FRAGMENT_BASE}-$SYNC_ENV.env"
           ssh "$SSH_DESTINATION" "bash -s" -- "$WEBHOOK_DIR" "$WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE" "$SYNC_ENV" "$FRAGMENT_BASE" << 'REMOTE'
           WEBHOOK_DIR="$1"
@@ -114,6 +113,6 @@ jobs:
             mv "$tmp" "$env_file"
             tmp=$(mktemp)
           done < "$FRAGMENT"
-          rm -f "$tmp" "$FRAGMENT"
-          echo "Updated $env_file"
+          rm -f "$tmp"
+          echo "Updated $env_file; app env file left at $FRAGMENT for redeploy"
           REMOTE
