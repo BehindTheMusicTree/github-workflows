@@ -44,7 +44,7 @@ jobs:
           SCRIPTS_DIR="${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${ENV_LC}/scripts/"
           echo "remote_path=${SCRIPTS_DIR}${{ inputs.app_name }}-tag" >> $GITHUB_OUTPUT
 
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
 
