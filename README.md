@@ -11,6 +11,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - [Available Workflows](#available-workflows)
   - [Actionlint](#actionlint)
   - [Call Redeployment Webhook](#call-redeployment-webhook)
+  - [Sync env to server](#sync-env-to-server)
   - [Deploy App Env File](#deploy-app-env-file)
   - [Deploy Nginx Env Fragment](#deploy-nginx-env-fragment)
   - [Deploy Partial Docker Compose](#deploy-partial-docker-compose)
@@ -56,6 +57,20 @@ Triggers a server redeployment webhook. Validates configuration, ensures `env` i
 |--------|----------|-------------|
 | `env`  | Yes      | `test` or `prod` (lowercase) |
 | `images` | No     | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`. |
+
+### Sync env to server
+
+App-agnostic reusable: upload an env fragment and merge it into the server `scripts/.env` for one environment. Path and fragment content come from the **caller’s** vars and secrets (no app-specific inputs). Any app can use it by setting the required vars/secrets in its repo and calling with `secrets: inherit` and the right `environment`.
+
+**Workflow file:** `.github/workflows/sync-env-to-server.yml`
+
+| Input     | Required | Description |
+|-----------|----------|-------------|
+| `sync_env`              | Yes      | `test` or `prod` (lowercase) |
+| `app_name`              | Yes      | App name for fragment path (e.g. `htmt-api`) |
+| `fragment_artifact`    | Yes      | Artifact name and path to fragment file (e.g. `sync-env-fragment/fragment.env`) |
+
+**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a second job that calls this workflow with `needs: build-fragment`, `environment` (TEST or PROD), `secrets: inherit`, inputs `sync_env`, `app_name`, and `fragment_artifact` (e.g. `sync-env-fragment/fragment.env`). Required **vars** (repo or environment): `VPS_IP`, `WEBHOOK_DIR`, `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE`, `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`. Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`. Required **vars** (repo or environment): `VPS_IP`, `WEBHOOK_DIR`, `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE`, `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
 
 ### Deploy App Env File
 
@@ -150,6 +165,22 @@ This repo only contains workflow definitions. Each repository that **calls** the
 | Secret  | `REDEPLOYMENT_WEBHOOK_PORT` | Port the webhook service listens on |
 | Secret  | `REDEPLOYMENT_WEBHOOK_SECRET_TEST` | Webhook secret for env `test` (X-Secret header) |
 | Secret  | `REDEPLOYMENT_WEBHOOK_SECRET_PROD` | Webhook secret for env `prod` |
+
+### Sync env to server
+
+Required by **sync-env-to-server** (caller’s environment):
+
+| Type    | Name | Description |
+|---------|------|-------------|
+| Variable | `VPS_IP` | VPS IP or hostname for SSH |
+| Variable | `WEBHOOK_DIR` | Base webhook dir on server (e.g. `/var/webhook/`) |
+| Variable | `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE` | Redeployment dir name base (e.g. `redeployment`) |
+| Variable | `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE` | Fragment filename prefix (e.g. `sync-env-`) |
+| Variable | `HTMT_API_APP_NAME` or `APP_NAME` | App name for fragment path (e.g. `htmt-api`) |
+| Secret  | `SERVER_DEPLOY_USERNAME` | SSH user |
+| Secret  | `SERVER_DEPLOY_SSH_PRIVATE_KEY` | SSH private key |
+
+Plus any vars/secrets for the fragment keys (see workflow; add new keys in the reusable when needed).
 
 ### Deploy workflows
 

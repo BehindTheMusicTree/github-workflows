@@ -1,0 +1,109 @@
+# App-agnostic reusable workflow: transfer an env fragment (from caller artifact) to the server and merge into scripts/.env.
+# Caller builds the fragment in its repo (app-specific keys), uploads it as an artifact, then calls this workflow.
+# This workflow only: downloads the artifact, scp to server, merge. Path from caller vars (VPS_IP, WEBHOOK_DIR, etc.).
+name: Sync env to server
+
+on:
+  workflow_call:
+    inputs:
+      sync_env:
+        description: "Environment name for path (test or prod)"
+        required: true
+        type: string
+      fragment_artifact:
+        description: "Artifact name and path to fragment file, e.g. sync-env-fragment/fragment.env"
+        required: true
+        type: string
+      app_name:
+        description: "App name for fragment path (e.g. htmt-api)"
+        required: true
+        type: string
+
+jobs:
+  sync:
+    name: Transfer fragment to server (${{ inputs.sync_env }})
+    runs-on: ubuntu-latest
+    env:
+      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.VPS_IP }}
+      WEBHOOK_DIR: ${{ vars.WEBHOOK_DIR }}
+      WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE: ${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}
+      SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE: ${{ vars.SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE }}
+      APP_NAME: ${{ inputs.app_name }}
+    steps:
+      - name: Check required vars and secrets
+        env:
+          VPS_IP: ${{ vars.VPS_IP }}
+          WEBHOOK_DIR: ${{ vars.WEBHOOK_DIR }}
+          WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE: ${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}
+          SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE: ${{ vars.SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE }}
+          SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
+          SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          required=(VPS_IP WEBHOOK_DIR WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
+          missing=()
+          for v in "${required[@]}"; do
+            [ -z "${!v}" ] && missing+=("$v")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "ERROR: Missing required vars or secrets: ${missing[*]}"
+            echo "Set them in Settings → Secrets and variables → Actions (repo or environment)."
+            exit 1
+          fi
+          echo "All required vars and secrets are set."
+
+      - name: Parse fragment artifact input
+        id: fragment
+        run: |
+          val="${{ inputs.fragment_artifact }}"
+          echo "artifact_name=${val%%/*}" >> "$GITHUB_OUTPUT"
+          echo "fragment_path=$val" >> "$GITHUB_OUTPUT"
+
+      - name: Download env fragment artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.fragment.outputs.artifact_name }}
+
+      - uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.VPS_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Upload fragment and merge into server .env (${{ inputs.sync_env }})
+        env:
+          SYNC_ENV: ${{ inputs.sync_env }}
+          FRAGMENT_FILE: ${{ steps.fragment.outputs.fragment_path }}
+        run: |
+          if [ ! -f "$FRAGMENT_FILE" ]; then
+            echo "ERROR: Fragment file not found: $FRAGMENT_FILE"
+            exit 1
+          fi
+          FRAGMENT_BASE="${SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE}${APP_NAME}"
+          scp -o StrictHostKeyChecking=accept-new "$FRAGMENT_FILE" "$SSH_DESTINATION:/tmp/${FRAGMENT_BASE}-$SYNC_ENV.env"
+          ssh "$SSH_DESTINATION" "bash -s" -- "$WEBHOOK_DIR" "$WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE" "$SYNC_ENV" "$FRAGMENT_BASE" << 'REMOTE'
+          WEBHOOK_DIR="$1"
+          BASE="$2"
+          env="$3"
+          prefix="$4"
+          FRAGMENT="/tmp/${prefix}-${env}.env"
+          scripts_dir="${WEBHOOK_DIR}${BASE}-${env}/scripts"
+          env_file="${scripts_dir}/.env"
+          if [ ! -f "$env_file" ]; then
+            echo "ERROR: $env_file not found"
+            exit 1
+          fi
+          tmp=$(mktemp)
+          while IFS= read -r line; do
+            [[ -z "$line" || "$line" =~ ^# ]] && continue
+            key="${line%%=*}"
+            grep -v "^${key}=" "$env_file" > "$tmp" 2>/dev/null || true
+            echo "$line" >> "$tmp"
+            mv "$tmp" "$env_file"
+            tmp=$(mktemp)
+          done < "$FRAGMENT"
+          rm -f "$tmp" "$FRAGMENT"
+          echo "Updated $env_file"
+          REMOTE
