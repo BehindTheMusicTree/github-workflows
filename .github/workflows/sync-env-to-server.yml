@@ -79,8 +79,14 @@ jobs:
       - name: Upload fragment and merge into server .env (${{ inputs.sync_env }})
         env:
           SYNC_ENV: ${{ inputs.sync_env }}
-          FRAGMENT_FILE: ${{ steps.fragment.outputs.artifact_name }}/${{ steps.fragment.outputs.fragment_path }}
         run: |
+          ARTIFACT_NAME="${{ steps.fragment.outputs.artifact_name }}"
+          FRAGMENT_PATH="${{ steps.fragment.outputs.fragment_path }}"
+          if [ -f "${ARTIFACT_NAME}/${FRAGMENT_PATH}" ]; then
+            FRAGMENT_FILE="${ARTIFACT_NAME}/${FRAGMENT_PATH}"
+          else
+            FRAGMENT_FILE="${FRAGMENT_PATH}"
+          fi
           if [ ! -f "$FRAGMENT_FILE" ]; then
             echo "ERROR: Fragment file not found: $FRAGMENT_FILE"
             exit 1
