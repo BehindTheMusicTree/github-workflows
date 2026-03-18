@@ -1,6 +1,6 @@
 # App-agnostic reusable workflow: transfer an env fragment (from caller artifact) to the server and merge into scripts/.env.
 # Caller builds the fragment in its repo (app-specific keys), uploads it as an artifact, then calls this workflow.
-# This workflow only: downloads the artifact, scp to server, merge. Path from caller vars (VPS_IP, WEBHOOK_DIR, etc.).
+# Path from caller vars: VPS_IP, REDEPLOYMENT_ROOT (org pool, e.g. /var/webhook/redeployment).
 name: Sync env to server
 
 on:
@@ -25,20 +25,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.VPS_IP }}
-      WEBHOOK_DIR: ${{ vars.WEBHOOK_DIR }}
-      WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE: ${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}
+      REDEPLOYMENT_ROOT: ${{ vars.REDEPLOYMENT_ROOT }}
       SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE: ${{ vars.SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE }}
       APP_NAME: ${{ inputs.app_name }}
     steps:
       - name: Check required vars and secrets
         env:
           VPS_IP: ${{ vars.VPS_IP }}
-          WEBHOOK_DIR: ${{ vars.WEBHOOK_DIR }}
-          WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE: ${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}
+          REDEPLOYMENT_ROOT: ${{ vars.REDEPLOYMENT_ROOT }}
           SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
           SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
         run: |
-          required=(VPS_IP WEBHOOK_DIR WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
+          required=(VPS_IP REDEPLOYMENT_ROOT SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
           missing=()
           for v in "${required[@]}"; do
             [ -z "${!v}" ] && missing+=("$v")
@@ -92,13 +90,13 @@ jobs:
           fi
           FRAGMENT_BASE="${SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE:-sync-env-}${APP_NAME}"
           scp -o StrictHostKeyChecking=accept-new "$FRAGMENT_FILE" "$SSH_DESTINATION:/tmp/${FRAGMENT_BASE}-$SYNC_ENV.env"
-          ssh "$SSH_DESTINATION" "bash -s" -- "$WEBHOOK_DIR" "$WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE" "$SYNC_ENV" "$FRAGMENT_BASE" << 'REMOTE'
-          WEBHOOK_DIR="$1"
-          BASE="$2"
-          env="$3"
-          prefix="$4"
+          REDEPLOYMENT_ROOT="${REDEPLOYMENT_ROOT:-/var/webhook/redeployment}"
+          ssh "$SSH_DESTINATION" "bash -s" -- "$REDEPLOYMENT_ROOT" "$SYNC_ENV" "$FRAGMENT_BASE" << 'REMOTE'
+          REDEPLOYMENT_ROOT="$1"
+          env="$2"
+          prefix="$3"
           FRAGMENT="/tmp/${prefix}-${env}.env"
-          scripts_dir="${WEBHOOK_DIR}${BASE}-${env}/scripts"
+          scripts_dir="${REDEPLOYMENT_ROOT}-${env}/scripts"
           env_file="${scripts_dir}/.env"
           if [ ! -f "$env_file" ]; then
             echo "ERROR: $env_file not found"

@@ -1,5 +1,5 @@
 # Reusable workflow: write image tag to server scripts dir for the given env and service.
-# Caller must have vars WEBHOOK_DIR, WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE, VPS_IP
+# Caller must have var REDEPLOYMENT_ROOT (org pool, e.g. /var/webhook/redeployment), VPS_IP,
 # and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY (same as other deploy workflows).
 # Filename on server: ${app_name}-tag (e.g. htmt-api-tag, htmt-db-tag, afp-tag).
 name: Set image tag on server
@@ -39,9 +39,12 @@ jobs:
 
       - name: Set remote path
         id: path
+        env:
+          REDEPLOYMENT_ROOT: ${{ vars.REDEPLOYMENT_ROOT }}
         run: |
           ENV_LC="${{ steps.validate.outputs.env_lower }}"
-          SCRIPTS_DIR="${{ vars.WEBHOOK_DIR }}${{ vars.WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE }}-${ENV_LC}/scripts/"
+          REDEPLOYMENT_ROOT="${REDEPLOYMENT_ROOT:-/var/webhook/redeployment}"
+          SCRIPTS_DIR="${REDEPLOYMENT_ROOT}-${ENV_LC}/scripts/"
           echo "remote_path=${SCRIPTS_DIR}${{ inputs.app_name }}-tag" >> $GITHUB_OUTPUT
 
       - uses: webfactory/ssh-agent@v0.10.0

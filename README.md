@@ -70,7 +70,7 @@ App-agnostic reusable: upload an env fragment and merge it into the server `scri
 | `app_name`              | Yes      | App name for fragment path (e.g. `htmt-api`) |
 | `fragment_artifact`    | Yes      | Artifact name and path to fragment file (e.g. `sync-env-fragment-test/fragment.env`) |
 
-**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact` (e.g. `sync-env-fragment-test/fragment.env`). Required **vars** (repo or environment): `VPS_IP`, `WEBHOOK_DIR`, `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE`, `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`. Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`. Required **vars** (repo or environment): `VPS_IP`, `WEBHOOK_DIR`, `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE`, `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
+**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact` (e.g. `sync-env-fragment-test/fragment.env`). Required **vars** (repo or environment): `VPS_IP`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`. Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`. Required **vars** (repo or environment): `VPS_IP`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
 
 ### Deploy App Env File
 
@@ -173,8 +173,7 @@ Required by **sync-env-to-server** (caller’s environment):
 | Type    | Name | Description |
 |---------|------|-------------|
 | Variable | `VPS_IP` | VPS IP or hostname for SSH |
-| Variable | `WEBHOOK_DIR` | Base webhook dir on server (e.g. `/var/webhook/`) |
-| Variable | `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE` | Redeployment dir name base (e.g. `redeployment`) |
+| Variable | `REDEPLOYMENT_ROOT` | Redeployment tree root on server (e.g. `/var/webhook/redeployment`); scripts dir = `{REDEPLOYMENT_ROOT}-{env}/scripts/` |
 | Variable | `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE` | Fragment filename prefix (e.g. `sync-env-`) |
 | Variable | `HTMT_API_APP_NAME` or `APP_NAME` | App name for fragment path (e.g. `htmt-api`) |
 | Secret  | `SERVER_DEPLOY_USERNAME` | SSH user |
@@ -188,8 +187,7 @@ Required by **deploy-app-env-file**, **deploy-nginx-env-fragment**, and **deploy
 
 | Type    | Name | Description |
 |---------|------|-------------|
-| Variable | `WEBHOOK_DIR` | Base dir on server (e.g. `/home/deploy/`) |
-| Variable | `WEBHOOK_REDEPLOYMENT_DIR_NAME_BASE` | Base name; pool/compose paths use `<base>-<env>` (e.g. `btmt-redeploy-test`) |
+| Variable | `REDEPLOYMENT_ROOT` | Redeployment tree root (e.g. `/var/webhook/redeployment`); pool/compose paths use `{REDEPLOYMENT_ROOT}-{env}/` |
 | Variable | `DOCKER_COMPOSE_DIR_NAME` | Compose dir name under redeploy dir |
 | Variable | `VPS_IP` | VPS IP or hostname for SSH |
 | Secret  | `SERVER_DEPLOY_USERNAME` | SSH user for deploy |
