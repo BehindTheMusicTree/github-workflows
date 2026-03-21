@@ -8,7 +8,7 @@ on:
   workflow_call:
     inputs:
       env:
-        description: "Environment (test or prod)"
+        description: "Environment (staging or prod)"
         required: true
         type: string
       tag:
@@ -31,8 +31,8 @@ jobs:
         id: validate
         run: |
           env_lower=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')
-          if [[ "$env_lower" != "test" && "$env_lower" != "prod" ]]; then
-            echo "ERROR: env must be 'test' or 'prod' (got: ${{ inputs.env }})."
+          if [[ "$env_lower" != "prod" && "$env_lower" != "staging" ]]; then
+            echo "ERROR: env must be 'prod' or 'staging' (got: ${{ inputs.env }})."
             exit 1
           fi
           echo "env_lower=$env_lower" >> $GITHUB_OUTPUT

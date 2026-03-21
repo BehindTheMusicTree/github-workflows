@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       env:
-        description: "Environment (must be prod or test)"
+        description: "Environment (prod or staging)"
         required: true
         type: string
       images:
@@ -41,8 +41,8 @@ jobs:
             exit 1
           fi
           env_lower=$(echo "$env" | tr '[:upper:]' '[:lower:]')
-          if [[ "$env_lower" != "test" && "$env_lower" != "prod" ]]; then
-            echo "ERROR: env must be 'prod' or 'test' (got: $env)."
+          if [[ "$env_lower" != "prod" && "$env_lower" != "staging" ]]; then
+            echo "ERROR: env must be 'prod' or 'staging' (got: $env)."
             exit 1
           fi
           echo "env_normalized=$env_lower" >> "$GITHUB_OUTPUT"
@@ -62,13 +62,18 @@ jobs:
           VPS_IP: ${{ vars.VPS_IP }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           REDEPLOYMENT_HOOK_ID_BASE: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
-          REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
+          REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD || secrets.REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
         run: |
           missing=""
           [[ -z "$VPS_IP" ]] && missing="${missing} VPS_IP"
           [[ -z "$REDEPLOYMENT_WEBHOOK_PORT" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT"
           [[ -z "$REDEPLOYMENT_HOOK_ID_BASE" ]] && missing="${missing} REDEPLOYMENT_HOOK_ID_BASE"
-          [[ -z "$REDEPLOYMENT_WEBHOOK_SECRET" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET_${ENV}"
+          case "$ENV" in
+            prod) sec_name=REDEPLOYMENT_WEBHOOK_SECRET_PROD ;;
+            staging) sec_name=REDEPLOYMENT_WEBHOOK_SECRET_STAGING ;;
+            *) sec_name="REDEPLOYMENT_WEBHOOK_SECRET_<env>" ;;
+          esac
+          [[ -z "$REDEPLOYMENT_WEBHOOK_SECRET" ]] && missing="${missing} $sec_name"
           if [[ -n "$missing" ]]; then
             echo "ERROR: Missing required config:$missing"
             echo "Set variables and secrets in Settings → Environments (or org/repo level). See README."
@@ -87,7 +92,7 @@ jobs:
       - name: Call redeploy webhook
         env:
           SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.VPS_IP }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}-${{ needs.validate-env.outputs.env_normalized }}
-          REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'test' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_TEST || (needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD) }}
+          REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD || secrets.REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
           IMAGES_PAYLOAD: ${{ inputs.images }}
         run: |
           set +e

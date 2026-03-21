@@ -49,13 +49,13 @@ jobs:
 
 ### Call Redeployment Webhook
 
-Triggers a server redeployment webhook. Validates configuration, ensures `env` is `test` or `prod`, and POSTs to the webhook (optional JSON image overrides in body). Response must start with `Redeploying BTMT ecosystem`.
+Triggers a server redeployment webhook. Validates configuration, ensures `env` is `prod` or `staging`, and POSTs to the webhook (optional JSON image overrides in body). Response must start with `Redeploying BTMT ecosystem`.
 
 **Workflow file:** `.github/workflows/call-redeployment-webhook.yml`
 
 | Input   | Required | Description |
 |--------|----------|-------------|
-| `env`  | Yes      | `test` or `prod` (lowercase) |
+| `env`  | Yes      | `prod` or `staging` (lowercase) |
 | `images` | No     | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`. |
 
 ### Sync env to server
@@ -66,11 +66,11 @@ App-agnostic reusable: upload an env fragment and merge it into the server `scri
 
 | Input     | Required | Description |
 |-----------|----------|-------------|
-| `sync_env`              | Yes      | `test` or `prod` (lowercase) |
+| `sync_env`              | Yes      | `prod` or `staging` (lowercase) |
 | `app_name`              | Yes      | App name for fragment path (e.g. `htmt-api`) |
-| `fragment_artifact`    | Yes      | Artifact name and path to fragment file (e.g. `sync-env-fragment-test/fragment.env`) |
+| `fragment_artifact`    | Yes      | Artifact name and path to fragment file (e.g. `sync-env-fragment-staging/fragment.env`) |
 
-**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact` (e.g. `sync-env-fragment-test/fragment.env`). Required **vars** (repo or environment): `VPS_IP`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`. Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`. Required **vars** (repo or environment): `VPS_IP`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
+**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact` (e.g. `sync-env-fragment-staging/fragment.env`). Required **vars** (repo or environment): `VPS_IP`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`. Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`. Required **vars** (repo or environment): `VPS_IP`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
 
 ### Deploy App Env File
 
@@ -80,7 +80,7 @@ Uploads compose env files to `pool/compose/<app_name>/` on the server. Caller mu
 
 | Input | Required | Description |
 |-------|----------|-------------|
-| `env` | Yes | `test` or `prod` (lowercase) |
+| `env` | Yes | `prod` or `staging` (lowercase) |
 | `app_name` | Yes | Subdir under pool/compose (e.g. `htmt-api`, `gtmt-front`) |
 | `artifact_name` | No | Artifact name; default `app-env-files` |
 
@@ -92,19 +92,19 @@ Uploads a single nginx env fragment to `pool/nginx/<app_name>.env`. Caller must 
 
 | Input | Required | Description |
 |-------|----------|-------------|
-| `env` | Yes | `test` or `prod` (lowercase) |
+| `env` | Yes | `prod` or `staging` (lowercase) |
 | `app_name` | Yes | Fragment is uploaded as `pool/nginx/<app_name>.env` |
 | `artifact_name` | No | Artifact name; default `nginx-env-fragment` |
 
 ### Deploy Partial Docker Compose
 
-Uploads partial docker-compose files to the server compose dir. Before upload, adds suffix `-<env>` to every `container_name` in the compose files (e.g. `gtmt-front` → `gtmt-front-test`). Caller must upload an artifact (e.g. `compose-parts`) containing the partial YAML file(s).
+Uploads partial docker-compose files to the server compose dir. Before upload, adds suffix `-<env>` to every `container_name` in the compose files (e.g. `gtmt-front` → `gtmt-front-staging`). Caller must upload an artifact (e.g. `compose-parts`) containing the partial YAML file(s).
 
 **Workflow file:** `.github/workflows/deploy-docker-compose-part.yml`
 
 | Input | Required | Description |
 |-------|----------|-------------|
-| `env` | Yes | `test` or `prod` (lowercase) |
+| `env` | Yes | `prod` or `staging` (lowercase) |
 | `app_version` | No | For logging only |
 | `artifact_name` | No | Artifact name; default `compose-parts` |
 
@@ -118,7 +118,7 @@ jobs:
     name: Call Redeployment Webhook
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
-      env: "test"   # or "prod"
+      env: "staging"   # or "prod"
       images: "{}" # optional: {"gateway_image": "user/repo:tag"}
     secrets: inherit
 ```
@@ -139,7 +139,7 @@ jobs:
     needs: [build-and-push]
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
-      env: "test"
+      env: "staging"
     secrets: inherit
 ```
 
@@ -154,16 +154,16 @@ Caller pattern: one **prepare** job uploads artifacts (use non-dotfile names for
 
 ## Required Configuration
 
-This repo only contains workflow definitions. Each repository that **calls** these workflows must configure the required secrets and variables in GitHub (repository or organization) under the environment used (e.g. `test`, `prod`).
+This repo only contains workflow definitions. Each repository that **calls** these workflows must configure the required secrets and variables in GitHub (repository or organization) under the environment used (`staging` or `prod`).
 
 ### Webhook (call-redeployment-webhook)
 
 | Type    | Name | Description |
 |---------|------|-------------|
 | Variable | `VPS_IP` | VPS IP or hostname for webhook URL (use when main domain points elsewhere, e.g. Vercel) |
-| Variable | `REDEPLOYMENT_HOOK_ID_BASE` | Base hook id; URL path is `/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `myhook-test`) |
+| Variable | `REDEPLOYMENT_HOOK_ID_BASE` | Base hook id; URL path is `/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `myhook-staging`) |
 | Secret  | `REDEPLOYMENT_WEBHOOK_PORT` | Port the webhook service listens on |
-| Secret  | `REDEPLOYMENT_WEBHOOK_SECRET_TEST` | Webhook secret for env `test` (X-Secret header) |
+| Secret  | `REDEPLOYMENT_WEBHOOK_SECRET_STAGING` | Webhook secret for env `staging` (X-Secret header) |
 | Secret  | `REDEPLOYMENT_WEBHOOK_SECRET_PROD` | Webhook secret for env `prod` |
 
 ### Sync env to server
@@ -195,7 +195,7 @@ Required by **deploy-app-env-file**, **deploy-nginx-env-fragment**, and **deploy
 
 ## Setup Instructions
 
-1. **Configure secrets and variables** in the repo (or org) that calls the workflows: **Settings** → **Environments** → create or select `test` / `prod` and add the required entries from [Required Configuration](#required-configuration).
+1. **Configure secrets and variables** in the repo (or org) that calls the workflows: **Settings** → **Environments** → create or select `staging` / `prod` and add the required entries from [Required Configuration](#required-configuration).
 2. **Add workflow calls** to your workflow file (see [Usage](#usage)). For deploy flows, copy and adapt a caller from `examples/`.
 3. **Verify access**: Public repos can use these reusables as-is; private repos require the org to allow reusable workflows from private repos.
 
@@ -203,7 +203,7 @@ Required by **deploy-app-env-file**, **deploy-nginx-env-fragment**, and **deploy
 
 ### Call Redeployment Webhook
 
-1. **Validate env**: Ensures `env` is `test` or `prod`.
+1. **Validate env**: Ensures `env` is `prod` or `staging`.
 2. **Check required config**: Validates webhook-related secrets and variables for that env.
 3. **Call webhook**: POSTs to the webhook URL (optional JSON body for image overrides).
 4. **Validate response**: Fails if response does not start with `Redeploying BTMT ecosystem`.
@@ -211,13 +211,13 @@ Required by **deploy-app-env-file**, **deploy-nginx-env-fragment**, and **deploy
 ### Expected Webhook Response
 
 - **Status code**: `200 OK`
-- **Response body**: Must start with `Redeploying BTMT ecosystem` (e.g. `Redeploying BTMT ecosystem (test)` is accepted).
+- **Response body**: Must start with `Redeploying BTMT ecosystem` (e.g. `Redeploying BTMT ecosystem (staging)` is accepted).
 
 ### Error Handling
 
 The webhook workflow fails with clear errors if:
 
-- `env` is not `test` or `prod`
+- `env` is not `prod` or `staging`
 - Required secrets/variables are missing
 - Webhook is unreachable (e.g. connection refused)
 - Response does not match expected prefix or hook not found (404)
@@ -230,14 +230,14 @@ The workflow builds the URL using **VPS_IP** (the webhook runs on the VPS; use V
 http://<VPS_IP>:<REDEPLOYMENT_WEBHOOK_PORT>/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>
 ```
 
-Example: `VPS_IP=203.0.113.10`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=test`  
-→ `http://203.0.113.10:9000/hooks/btmt-redeploy-test`
+Example: `VPS_IP=203.0.113.10`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=staging`  
+→ `http://203.0.113.10:9000/hooks/btmt-redeploy-staging`
 
-Manual test (use the secret for the env you target):
+Manual check (use the secret for the env you target):
 
 ```bash
 curl -v -X POST -H "Content-Type: application/json" -H "X-Secret: YOUR_SECRET" -d '{}' --max-time 15 \
-  http://<VPS_IP>:9000/hooks/btmt-redeploy-test
+  http://<VPS_IP>:9000/hooks/btmt-redeploy-staging
 ```
 
 ## Troubleshooting
@@ -248,18 +248,18 @@ curl -v -X POST -H "Content-Type: application/json" -H "X-Secret: YOUR_SECRET" -
 - Verify the workflow file exists on the `main` branch
 - Check that the repository path is correct
 
-### "Missing required config" / "env must be 'test' or 'prod'" Error
+### "Missing required config" / invalid `env` Error
 
-- Set all required secrets and variables for the environment you use (`test` or `prod`)
-- Use `REDEPLOYMENT_WEBHOOK_SECRET_TEST` and `REDEPLOYMENT_WEBHOOK_SECRET_PROD` (not a single `REDEPLOYMENT_WEBHOOK_SECRET`)
+- Set all required secrets and variables for the environment you use (`staging` or `prod`)
+- Use `REDEPLOYMENT_WEBHOOK_SECRET_STAGING` and `REDEPLOYMENT_WEBHOOK_SECRET_PROD` (not a single `REDEPLOYMENT_WEBHOOK_SECRET`)
 - Ensure `REDEPLOYMENT_HOOK_ID_BASE` is set; the hook path is `<REDEPLOYMENT_HOOK_ID_BASE>-<env>`
 
 ### "Webhook call failed" / "Connection refused" Error
 
 - Ensure the webhook service is running on the server: `systemctl status webhook`
 - Check port and firewall; `REDEPLOYMENT_WEBHOOK_PORT` must match the server
-- In `hooks.json`, the hook id must be `<REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `btmt-redeploy-test`)
-- Verify the X-Secret header matches the secret for that env (`REDEPLOYMENT_WEBHOOK_SECRET_TEST` or `_PROD`)
+- In `hooks.json`, the hook id must be `<REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `btmt-redeploy-staging`)
+- Verify the X-Secret header matches the secret for that env (`REDEPLOYMENT_WEBHOOK_SECRET_STAGING` or `_PROD`)
 
 ### "Artifact not found" when calling deploy workflows from another repo
 

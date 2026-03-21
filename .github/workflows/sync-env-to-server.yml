@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       sync_env:
-        description: "Environment name for path (test or prod)"
+        description: "Environment name for path (prod or staging)"
         required: true
         type: string
       fragment_artifact:

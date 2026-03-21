@@ -54,6 +54,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **Staging vs prod only**: `call-redeployment-webhook` and `set-image-tag-on-server` accept `env: prod` or `env: staging` only (no `test`). Staging uses `REDEPLOYMENT_WEBHOOK_SECRET_STAGING` and hook path `...-staging`. GitHub **Environments** should be `staging` and `prod`.
+
 ### Changed
 
 - **Webhook and SSH use VPS_IP**: call-redeployment-webhook and set-image-tag-on-server now use variable **VPS_IP** (instead of DOMAIN_NAME) for the webhook URL host and SSH destination. Use when the main domain points elsewhere (e.g. Vercel). Callers must set **VPS_IP** in the environment (repo or org variables).
