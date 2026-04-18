@@ -192,15 +192,23 @@ Releases are made from `main`.
    git pull origin main
    ```
 
-2. **Update [CHANGELOG.md](CHANGELOG.md)**
-   - Move entries from `[Unreleased]` into a new versioned section (e.g. `## [0.2.0] - YYYY-MM-DD`).
-   - Follow [Semantic Versioning](https://semver.org/).
+2. **Run the release script**
 
-3. **Tag and push**
+```bash
+  .github/scripts/release.sh patch
+```
+
+- Accepts exactly one bump type: `major`, `minor`, or `patch`
+- Computes the next version from the current root `VERSION` file
+- Moves current `[Unreleased]` entries under a new section `## [0.2.0] - YYYY-MM-DD`
+- Bumps the root `VERSION` file
+- Creates commit `chore(release): vX.Y.Z`
+- Creates tag `vX.Y.Z` and pushes that tag to `origin`
+
+3. **Push commit to `main`**
 
    ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
+   git push origin main
    ```
 
 4. **Create a GitHub Release** (optional) from the tag and paste the changelog section for that version.

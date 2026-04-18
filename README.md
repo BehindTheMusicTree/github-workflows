@@ -53,10 +53,10 @@ Triggers a server redeployment webhook. Validates configuration, ensures `env` i
 
 **Workflow file:** `.github/workflows/call-redeployment-webhook.yml`
 
-| Input   | Required | Description |
-|--------|----------|-------------|
-| `env`  | Yes      | `prod` or `staging` (lowercase) |
-| `images` | No     | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`. |
+| Input    | Required | Description                                                                                        |
+| -------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `env`    | Yes      | `prod` or `staging` (lowercase)                                                                    |
+| `images` | No       | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`. |
 
 ### Sync env to server
 
@@ -64,13 +64,13 @@ App-agnostic reusable: upload an env fragment and merge it into the server `scri
 
 **Workflow file:** `.github/workflows/sync-env-to-server.yml`
 
-| Input     | Required | Description |
-|-----------|----------|-------------|
-| `sync_env`              | Yes      | `prod` or `staging` (lowercase) |
-| `app_name`              | Yes      | App name for fragment path (e.g. `htmt-api`) |
-| `fragment_artifact`    | Yes      | Artifact name and path to fragment file (e.g. `sync-env-fragment-staging/fragment.env`) |
+| Input               | Required | Description                                                                             |
+| ------------------- | -------- | --------------------------------------------------------------------------------------- |
+| `sync_env`          | Yes      | `prod` or `staging` (lowercase)                                                         |
+| `app_name`          | Yes      | App name for fragment path (e.g. `htmt-api`)                                            |
+| `fragment_artifact` | Yes      | Artifact name and path to fragment file (e.g. `sync-env-fragment-staging/fragment.env`) |
 
-**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact` (e.g. `sync-env-fragment-staging/fragment.env`). Required **vars** (repo or environment): `VPS_IP`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`. Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`. Required **vars** (repo or environment): `VPS_IP`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
+**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact` (e.g. `sync-env-fragment-staging/fragment.env`). Required **vars** (repo or environment): `SERVER_HOST`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`. Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`. Required **vars** (repo or environment): `SERVER_HOST`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
 
 ### Deploy App Env File
 
@@ -78,11 +78,11 @@ Uploads compose env files to `pool/compose/<app_name>/` on the server. Caller mu
 
 **Workflow file:** `.github/workflows/deploy-app-env-file.yml`
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| `env` | Yes | `prod` or `staging` (lowercase) |
-| `app_name` | Yes | Subdir under pool/compose (e.g. `htmt-api`, `gtmt-front`) |
-| `artifact_name` | No | Artifact name; default `app-env-files` |
+| Input           | Required | Description                                               |
+| --------------- | -------- | --------------------------------------------------------- |
+| `env`           | Yes      | `prod` or `staging` (lowercase)                           |
+| `app_name`      | Yes      | Subdir under pool/compose (e.g. `htmt-api`, `gtmt-front`) |
+| `artifact_name` | No       | Artifact name; default `app-env-files`                    |
 
 ### Deploy Nginx Env Fragment
 
@@ -90,11 +90,11 @@ Uploads a single nginx env fragment to `pool/nginx/<app_name>.env`. Caller must 
 
 **Workflow file:** `.github/workflows/deploy-nginx-env-fragment.yml`
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| `env` | Yes | `prod` or `staging` (lowercase) |
-| `app_name` | Yes | Fragment is uploaded as `pool/nginx/<app_name>.env` |
-| `artifact_name` | No | Artifact name; default `nginx-env-fragment` |
+| Input           | Required | Description                                         |
+| --------------- | -------- | --------------------------------------------------- |
+| `env`           | Yes      | `prod` or `staging` (lowercase)                     |
+| `app_name`      | Yes      | Fragment is uploaded as `pool/nginx/<app_name>.env` |
+| `artifact_name` | No       | Artifact name; default `nginx-env-fragment`         |
 
 ### Deploy Partial Docker Compose
 
@@ -102,11 +102,11 @@ Uploads partial docker-compose files to the server compose dir. Before upload, a
 
 **Workflow file:** `.github/workflows/deploy-docker-compose-part.yml`
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| `env` | Yes | `prod` or `staging` (lowercase) |
-| `app_version` | No | For logging only |
-| `artifact_name` | No | Artifact name; default `compose-parts` |
+| Input           | Required | Description                            |
+| --------------- | -------- | -------------------------------------- |
+| `env`           | Yes      | `prod` or `staging` (lowercase)        |
+| `app_version`   | No       | For logging only                       |
+| `artifact_name` | No       | Artifact name; default `compose-parts` |
 
 ## Usage
 
@@ -118,7 +118,7 @@ jobs:
     name: Call Redeployment Webhook
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
-      env: "staging"   # or "prod"
+      env: "staging" # or "prod"
       images: "{}" # optional: {"gateway_image": "user/repo:tag"}
     secrets: inherit
 ```
@@ -158,26 +158,26 @@ This repo only contains workflow definitions. Each repository that **calls** the
 
 ### Webhook (call-redeployment-webhook)
 
-| Type    | Name | Description |
-|---------|------|-------------|
-| Variable | `VPS_IP` | VPS IP or hostname for webhook URL (use when main domain points elsewhere, e.g. Vercel) |
-| Variable | `REDEPLOYMENT_HOOK_ID_BASE` | Base hook id; URL path is `/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `myhook-staging`) |
-| Secret  | `REDEPLOYMENT_WEBHOOK_PORT` | Port the webhook service listens on |
-| Secret  | `REDEPLOYMENT_WEBHOOK_SECRET_STAGING` | Webhook secret for env `staging` (X-Secret header) |
-| Secret  | `REDEPLOYMENT_WEBHOOK_SECRET_PROD` | Webhook secret for env `prod` |
+| Type     | Name                                  | Description                                                                                  |
+| -------- | ------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Variable | `SERVER_HOST`                         | VPS IP or hostname for webhook URL (use when main domain points elsewhere, e.g. Vercel)      |
+| Variable | `REDEPLOYMENT_HOOK_ID_BASE`           | Base hook id; URL path is `/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `myhook-staging`) |
+| Secret   | `REDEPLOYMENT_WEBHOOK_PORT`           | Port the webhook service listens on                                                          |
+| Secret   | `REDEPLOYMENT_WEBHOOK_SECRET_STAGING` | Webhook secret for env `staging` (X-Secret header)                                           |
+| Secret   | `REDEPLOYMENT_WEBHOOK_SECRET_PROD`    | Webhook secret for env `prod`                                                                |
 
 ### Sync env to server
 
 Required by **sync-env-to-server** (caller’s environment):
 
-| Type    | Name | Description |
-|---------|------|-------------|
-| Variable | `VPS_IP` | VPS IP or hostname for SSH |
-| Variable | `REDEPLOYMENT_ROOT` | Redeployment tree root on server (e.g. `/var/webhook/redeployment`); scripts dir = `{REDEPLOYMENT_ROOT}-{env}/scripts/` |
-| Variable | `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE` | Fragment filename prefix (e.g. `sync-env-`) |
-| Variable | `HTMT_API_APP_NAME` or `APP_NAME` | App name for fragment path (e.g. `htmt-api`) |
-| Secret  | `SERVER_DEPLOY_USERNAME` | SSH user |
-| Secret  | `SERVER_DEPLOY_SSH_PRIVATE_KEY` | SSH private key |
+| Type     | Name                                   | Description                                                                                                             |
+| -------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Variable | `SERVER_HOST`                          | VPS IP or hostname for SSH                                                                                              |
+| Variable | `REDEPLOYMENT_ROOT`                    | Redeployment tree root on server (e.g. `/var/webhook/redeployment`); scripts dir = `{REDEPLOYMENT_ROOT}-{env}/scripts/` |
+| Variable | `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE` | Fragment filename prefix (e.g. `sync-env-`)                                                                             |
+| Variable | `HTMT_API_APP_NAME` or `APP_NAME`      | App name for fragment path (e.g. `htmt-api`)                                                                            |
+| Secret   | `SERVER_DEPLOY_USERNAME`               | SSH user                                                                                                                |
+| Secret   | `SERVER_DEPLOY_SSH_PRIVATE_KEY`        | SSH private key                                                                                                         |
 
 Plus any vars/secrets for the fragment keys (see workflow; add new keys in the reusable when needed).
 
@@ -185,13 +185,13 @@ Plus any vars/secrets for the fragment keys (see workflow; add new keys in the r
 
 Required by **deploy-app-env-file**, **deploy-nginx-env-fragment**, and **deploy-docker-compose-part** (caller’s environment must have these):
 
-| Type    | Name | Description |
-|---------|------|-------------|
-| Variable | `REDEPLOYMENT_ROOT` | Redeployment tree root (e.g. `/var/webhook/redeployment`); pool/compose paths use `{REDEPLOYMENT_ROOT}-{env}/` |
-| Variable | `DOCKER_COMPOSE_DIR_NAME` | Compose dir name under redeploy dir |
-| Variable | `VPS_IP` | VPS IP or hostname for SSH |
-| Secret  | `SERVER_DEPLOY_USERNAME` | SSH user for deploy |
-| Secret  | `SERVER_DEPLOY_SSH_PRIVATE_KEY` | SSH private key for deploy |
+| Type     | Name                            | Description                                                                                                    |
+| -------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Variable | `REDEPLOYMENT_ROOT`             | Redeployment tree root (e.g. `/var/webhook/redeployment`); pool/compose paths use `{REDEPLOYMENT_ROOT}-{env}/` |
+| Variable | `DOCKER_COMPOSE_DIR_NAME`       | Compose dir name under redeploy dir                                                                            |
+| Variable | `SERVER_HOST`                   | VPS IP or hostname for SSH                                                                                     |
+| Secret   | `SERVER_DEPLOY_USERNAME`        | SSH user for deploy                                                                                            |
+| Secret   | `SERVER_DEPLOY_SSH_PRIVATE_KEY` | SSH private key for deploy                                                                                     |
 
 ## Setup Instructions
 
@@ -224,20 +224,20 @@ The webhook workflow fails with clear errors if:
 
 ## Webhook Endpoint
 
-The workflow builds the URL using **VPS_IP** (the webhook runs on the VPS; use VPS IP when the main domain points elsewhere, e.g. Vercel):
+The workflow builds the URL using **SERVER_HOST** (the webhook runs on the VPS; use VPS IP when the main domain points elsewhere, e.g. Vercel):
 
 ```
-http://<VPS_IP>:<REDEPLOYMENT_WEBHOOK_PORT>/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>
+http://<SERVER_HOST>:<REDEPLOYMENT_WEBHOOK_PORT>/hooks/<REDEPLOYMENT_HOOK_ID_BASE>-<env>
 ```
 
-Example: `VPS_IP=203.0.113.10`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=staging`  
+Example: `SERVER_HOST=203.0.113.10`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=staging`  
 → `http://203.0.113.10:9000/hooks/btmt-redeploy-staging`
 
 Manual check (use the secret for the env you target):
 
 ```bash
 curl -v -X POST -H "Content-Type: application/json" -H "X-Secret: YOUR_SECRET" -d '{}' --max-time 15 \
-  http://<VPS_IP>:9000/hooks/btmt-redeploy-staging
+  http://<SERVER_HOST>:9000/hooks/btmt-redeploy-staging
 ```
 
 ## Troubleshooting

@@ -60,6 +60,8 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Changed
 
+- **Webhook URL construction**: Host IP variable is now named `SERVER_HOST` instead of `VPS_IP`.
+
 - **Webhook and SSH use VPS_IP**: call-redeployment-webhook and set-image-tag-on-server now use variable **VPS_IP** (instead of DOMAIN_NAME) for the webhook URL host and SSH destination. Use when the main domain points elsewhere (e.g. Vercel). Callers must set **VPS_IP** in the environment (repo or org variables).
 
 - **Webhook ID**: REDEPLOYMENT_HOOK_ID is no longer a secret but now a var
@@ -67,6 +69,11 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 - **Set image tag on server**: Input renamed `service` → `app_name`, now required (no default)
   - Callers must pass explicit service/app name (e.g. htmt-api, htmt-db, afp); filename on server is `${app_name}-tag`
   - Updated workflow comment and tag description examples
+
+### CI
+
+- **Release automation**: Added `.github/scripts/release.sh` and `VERSION` file to automate release chores
+  - Script inserts the release section under `[Unreleased]`, bumps `VERSION`, commits, tags, and pushes the tag
 
 ## [0.1.1] - 2025-02-17
 

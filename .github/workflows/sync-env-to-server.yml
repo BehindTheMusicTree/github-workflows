@@ -1,6 +1,6 @@
 # App-agnostic reusable workflow: transfer an env fragment (from caller artifact) to the server and merge into scripts/.env.
 # Caller builds the fragment in its repo (app-specific keys), uploads it as an artifact, then calls this workflow.
-# Path from caller vars: VPS_IP, REDEPLOYMENT_ROOT (org pool, e.g. /var/webhook/redeployment).
+# Path from caller vars: SERVER_HOST, REDEPLOYMENT_ROOT (org pool, e.g. /var/webhook/redeployment).
 name: Sync env to server
 
 on:
@@ -24,19 +24,19 @@ jobs:
     name: Transfer fragment to server (${{ inputs.sync_env }})
     runs-on: ubuntu-latest
     env:
-      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.VPS_IP }}
+      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.SERVER_HOST }}
       REDEPLOYMENT_ROOT: ${{ vars.REDEPLOYMENT_ROOT }}
       SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE: ${{ vars.SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE }}
       APP_NAME: ${{ inputs.app_name }}
     steps:
       - name: Check required vars and secrets
         env:
-          VPS_IP: ${{ vars.VPS_IP }}
+          SERVER_HOST: ${{ vars.SERVER_HOST }}
           REDEPLOYMENT_ROOT: ${{ vars.REDEPLOYMENT_ROOT }}
           SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
           SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
         run: |
-          required=(VPS_IP REDEPLOYMENT_ROOT SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
+          required=(SERVER_HOST REDEPLOYMENT_ROOT SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
           missing=()
           for v in "${required[@]}"; do
             [ -z "${!v}" ] && missing+=("$v")
@@ -71,7 +71,7 @@ jobs:
       - name: Add host to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.VPS_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Upload fragment and merge into server .env (${{ inputs.sync_env }})
         env:
