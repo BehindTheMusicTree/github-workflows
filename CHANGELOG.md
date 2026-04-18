@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-04-18
+
+
 ### Changed
 
 - **call-redeployment-webhook**: Replaced `VPS_IP` variable reference with `SERVER_HOST` for consistency across workflows
