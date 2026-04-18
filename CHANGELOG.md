@@ -36,7 +36,6 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [0.1.2] - 2026-04-18
 
-
 ### Added
 
 - **Redeployment Webhook**: Added support for prod environment
@@ -57,6 +56,8 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-18
+
 ### Added
 
 - **Staging vs prod only**: `call-redeployment-webhook` and `set-image-tag-on-server` accept `env: prod` or `env: staging` only (no `test`). Staging uses `REDEPLOYMENT_WEBHOOK_SECRET_STAGING` and hook path `...-staging`. GitHub **Environments** should be `staging` and `prod`.
@@ -65,7 +66,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 - **Webhook URL construction**: Host IP variable is now named `SERVER_HOST` instead of `VPS_IP`.
 
-- **Webhook and SSH use VPS_IP**: call-redeployment-webhook and set-image-tag-on-server now use variable **VPS_IP** (instead of DOMAIN_NAME) for the webhook URL host and SSH destination. Use when the main domain points elsewhere (e.g. Vercel). Callers must set **VPS_IP** in the environment (repo or org variables).
+- **Webhook and SSH use SERVER_HOST**: call-redeployment-webhook and set-image-tag-on-server now use variable **SERVER_HOST** (instead of DOMAIN_NAME) for the webhook URL host and SSH destination. Use when the main domain points elsewhere (e.g. Vercel). Callers must set **SERVER_HOST** in the environment (repo or org variables).
 
 - **Webhook ID**: REDEPLOYMENT_HOOK_ID is no longer a secret but now a var
 
