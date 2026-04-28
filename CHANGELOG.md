@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-28
+
+
 ### CI
 
 - **Release process**: Added a Cursor project rule to always run `.github/scripts/release.sh` when the user asks for a new release
