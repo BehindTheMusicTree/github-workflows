@@ -1,0 +1,17 @@
+---
+description: Use release script for every new release request
+alwaysApply: true
+---
+
+# Releases Must Use Script
+
+When the user asks for a "new release" (or equivalent wording), always use `.github/scripts/release.sh` from the repository root.
+
+- Determine bump type (`major`, `minor`, or `patch`) from user intent.
+- If bump type is unclear, ask a single clarifying question before running the script.
+- Do not manually edit `CHANGELOG.md`, `VERSION`, create tags, or craft release commits as a substitute for the script.
+- Run the script as the source of truth for release preparation steps.
+
+Examples:
+- "new release" -> ask whether `major`, `minor`, or `patch`, then run `.github/scripts/release.sh <type>`.
+- "cut a patch release" -> run `.github/scripts/release.sh patch`.

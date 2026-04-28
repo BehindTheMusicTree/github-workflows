@@ -52,12 +52,21 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
-## [0.1.3] - 2026-04-18
+### CI
 
+- **Release process**: Added a Cursor project rule to always run `.github/scripts/release.sh` when the user asks for a new release
+
+## [0.1.4] - 2026-04-28
+
+### Documentation
+
+- **Variable naming**: Replaced the last `VPS_IP` reference in docs/changelog with `SERVER_HOST` for consistent terminology
+
+## [0.1.3] - 2026-04-18
 
 ### Changed
 
-- **call-redeployment-webhook**: Replaced `VPS_IP` variable reference with `SERVER_HOST` for consistency across workflows
+- **call-redeployment-webhook**: Standardized on `SERVER_HOST` variable naming for consistency across workflows
 
 ## [0.1.2] - 2026-04-18
 
