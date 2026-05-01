@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-05-01
+
+
 ### Changed
 
 - **call-redeployment-webhook**: Response validation now expects body prefix **`Redeployment accepted`** (aligned with **BehindTheMusicTree/infrastructure** `generate-hooks-json.sh` defaults for all stacks). Removed **`expected_response_prefix`** input.
