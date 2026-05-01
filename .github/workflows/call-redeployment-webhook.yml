@@ -111,8 +111,11 @@ jobs:
           fi
           http_code=$(echo "$response" | tail -n1)
           response=$(echo "$response" | sed '$d')
-          if [[ "$response" != "Redeploying BTMT ecosystem"* ]]; then
+          # Must match hooks.json response-message prefix from infrastructure generate-hooks-json.sh (all stacks).
+          expected_prefix="Redeployment accepted"
+          if [[ "$response" != "$expected_prefix"* ]]; then
             echo "ERROR: Webhook call failed with response: $response"
+            echo "Expected response body to start with: $expected_prefix"
             if [[ "$response" == "Hook not found." ]] || [[ "$http_code" == "404" ]]; then
               echo "REDEPLOYMENT_HOOK_ID_BASE + '-' + env must match the hook id in hooks.json (path is /hooks/<id>-<env>)."
             fi

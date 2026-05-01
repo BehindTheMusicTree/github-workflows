@@ -49,7 +49,7 @@ jobs:
 
 ### Call Redeployment Webhook
 
-Triggers a server redeployment webhook. Validates configuration, ensures `env` is `prod` or `staging`, and POSTs to the webhook (optional JSON image overrides in body). Response must start with `Redeploying BTMT ecosystem`.
+Triggers a server redeployment webhook. Validates configuration, ensures `env` is `prod` or `staging`, and POSTs to the webhook (optional JSON image overrides in body). The response body must start with **`Redeployment accepted`** (matches **`hooks.json`** from **BehindTheMusicTree/infrastructure** `generate-hooks-json.sh` for every stack).
 
 **Workflow file:** `.github/workflows/call-redeployment-webhook.yml`
 
@@ -122,6 +122,8 @@ jobs:
       images: "{}" # optional: {"gateway_image": "user/repo:tag"}
     secrets: inherit
 ```
+
+App repos (**BTMT**, **the-music-deck-admin**, etc.) use the same snippet; only **`REDEPLOYMENT_HOOK_ID_BASE`** and webhook secrets differ per stack.
 
 With dependencies (e.g. after build):
 
@@ -206,12 +208,12 @@ Required by **deploy-app-env-file**, **deploy-nginx-env-fragment**, and **deploy
 1. **Validate env**: Ensures `env` is `prod` or `staging`.
 2. **Check required config**: Validates webhook-related secrets and variables for that env.
 3. **Call webhook**: POSTs to the webhook URL (optional JSON body for image overrides).
-4. **Validate response**: Fails if response does not start with `Redeploying BTMT ecosystem`.
+4. **Validate response**: Fails if the response body does not start with **`Redeployment accepted`** (same prefix as **`hooks.json`** from **BehindTheMusicTree/infrastructure** `generate-hooks-json.sh` for every stack).
 
 ### Expected Webhook Response
 
 - **Status code**: `200 OK`
-- **Response body**: Must start with `Redeploying BTMT ecosystem` (e.g. `Redeploying BTMT ecosystem (staging)` is accepted).
+- **Response body**: Must start with **`Redeployment accepted`** (e.g. `Redeployment accepted (staging)` is accepted).
 
 ### Error Handling
 
@@ -220,7 +222,7 @@ The webhook workflow fails with clear errors if:
 - `env` is not `prod` or `staging`
 - Required secrets/variables are missing
 - Webhook is unreachable (e.g. connection refused)
-- Response does not match expected prefix or hook not found (404)
+- Response does not start with **`Redeployment accepted`** (regenerate **`hooks.json`** on the server after infra upgrades) or hook not found (404)
 
 ## Webhook Endpoint
 
