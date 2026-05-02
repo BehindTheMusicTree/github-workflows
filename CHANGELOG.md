@@ -52,6 +52,12 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-02
+
+### Changed
+
+- **call-redeployment-webhook** (**breaking**): BTMT stack webhook secrets renamed from **`REDEPLOYMENT_WEBHOOK_SECRET_{PROD,STAGING}`** to **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_{PROD,STAGING}`** in **`workflow_call`** / **`workflow_dispatch`**. **`TMD_ADMIN_WEBHOOK_SECRET_*`** and hook selection by **`hook_id_base`** are unchanged. Callers must rename GitHub secrets (same values) and bump **`uses:`** to **`@v0.3.0`**.
+
 ## [0.2.0] - 2026-05-02
 
 ### Changed

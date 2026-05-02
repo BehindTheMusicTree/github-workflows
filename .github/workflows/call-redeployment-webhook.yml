@@ -3,7 +3,7 @@
 # Server applies them before redeploy: gateway_image updates gateway .env and restarts gateway; other keys are written to scripts .env as UPPER_SNAKE_CASE.
 #
 # hook_id_base (required): POST /hooks/<hook_id_base>-<env>. X-Secret is TMD_ADMIN_WEBHOOK_SECRET_<env> when hook_id_base equals
-# vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE (trimmed, both non-empty); otherwise REDEPLOYMENT_WEBHOOK_SECRET_<env>.
+# vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE (trimmed, both non-empty); otherwise BTMT_REDEPLOYMENT_WEBHOOK_SECRET_<env>.
 name: Redeploy Webhook Call
 
 on:
@@ -39,11 +39,11 @@ on:
       REDEPLOYMENT_WEBHOOK_PORT:
         description: Webhook daemon port on SERVER_HOST.
         required: false
-      REDEPLOYMENT_WEBHOOK_SECRET_PROD:
-        description: X-Secret for prod when hook_id_base is not the TMD admin base.
+      BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD:
+        description: X-Secret for BTMT prod when hook_id_base is not the TMD admin base.
         required: false
-      REDEPLOYMENT_WEBHOOK_SECRET_STAGING:
-        description: X-Secret for staging when hook_id_base is not the TMD admin base.
+      BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING:
+        description: X-Secret for BTMT staging when hook_id_base is not the TMD admin base.
         required: false
       TMD_ADMIN_WEBHOOK_SECRET_PROD:
         description: X-Secret for TMD admin prod when hook_id_base equals vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE.
@@ -97,8 +97,8 @@ jobs:
           SERVER_HOST: ${{ vars.SERVER_HOST }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}
-          REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
-          REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
+          BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
+          BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
           TMD_ADMIN_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_PROD }}
           TMD_ADMIN_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_STAGING }}
         run: |
@@ -120,8 +120,8 @@ jobs:
             esac
           else
             case "$ENV" in
-              prod) [[ -z "${REDEPLOYMENT_WEBHOOK_SECRET_PROD:-}" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET_PROD" ;;
-              staging) [[ -z "${REDEPLOYMENT_WEBHOOK_SECRET_STAGING:-}" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET_STAGING" ;;
+              prod) [[ -z "${BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD:-}" ]] && missing="${missing} BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD" ;;
+              staging) [[ -z "${BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING:-}" ]] && missing="${missing} BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING" ;;
             esac
           fi
           if [[ -n "$missing" ]]; then
@@ -146,8 +146,8 @@ jobs:
           SERVER_HOST: ${{ vars.SERVER_HOST }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}
-          REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
-          REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
+          BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
+          BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
           TMD_ADMIN_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_PROD }}
           TMD_ADMIN_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_STAGING }}
           IMAGES_PAYLOAD: ${{ inputs.images }}
@@ -163,8 +163,8 @@ jobs:
             esac
           else
             case "$ENV" in
-              prod) secret="${REDEPLOYMENT_WEBHOOK_SECRET_PROD}" ;;
-              staging) secret="${REDEPLOYMENT_WEBHOOK_SECRET_STAGING}" ;;
+              prod) secret="${BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD}" ;;
+              staging) secret="${BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING}" ;;
               *) echo "ERROR: invalid ENV"; exit 1 ;;
             esac
           fi
