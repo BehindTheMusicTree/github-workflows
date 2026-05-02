@@ -52,12 +52,17 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
-## [0.1.6] - 2026-05-01
-
+## [0.2.0] - 2026-05-02
 
 ### Changed
 
-- **call-redeployment-webhook**: Response validation now expects body prefix **`Redeployment accepted`** (aligned with **BehindTheMusicTree/infrastructure** `generate-hooks-json.sh` defaults for all stacks). Removed **`expected_response_prefix`** input.
+- **call-redeployment-webhook** (**breaking**): Input **`hook_id_base`** is **required** (trimmed non-empty). URL is always **`/hooks/<hook_id_base>-<env>`**. **`X-Secret`** is **`TMD_ADMIN_WEBHOOK_SECRET_<env>`** when **`hook_id_base`** equals **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** (both trimmed, TMD var non-empty); otherwise **`REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Removed **`redeployment_webhook_secret`**. Callers must pass **`hook_id_base`** (e.g. **`${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}`** for BTMT, **`${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** for **The Music Deck admin** on infrastructure). **`secrets: inherit`** is enough for infrastructure’s second job. Unknown hook id still fails at the server (**404** / body check).
+
+## [0.1.7] - 2026-05-02
+
+### Added
+
+- **call-redeployment-webhook** (`workflow_call` / `workflow_dispatch`): Optional input **`hook_id_base`** and optional secret **`redeployment_webhook_secret`**. When **`hook_id_base`** is non-empty after trim, the workflow validates **`SERVER_HOST`**, **`REDEPLOYMENT_WEBHOOK_PORT`**, **`hook_id_base`**, and **`redeployment_webhook_secret`**, then POSTs **`/hooks/<hook_id_base>-<env>`** with **`X-Secret`** from **`redeployment_webhook_secret`** (same **`Redeployment accepted`** body check). **BehindTheMusicTree/infrastructure** uses this for **The Music Deck admin** staging after **`provision`**, passing **`hook_id_base`** from **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**. BTMT callers stay unchanged: omit **`hook_id_base`** (or pass empty) and use **`secrets: inherit`** with **`REDEPLOYMENT_HOOK_ID_BASE`** / **`REDEPLOYMENT_WEBHOOK_SECRET_*`**. Declared **`workflow_call`** secrets: **`REDEPLOYMENT_WEBHOOK_PORT`**, **`REDEPLOYMENT_WEBHOOK_SECRET_PROD`**, **`REDEPLOYMENT_WEBHOOK_SECRET_STAGING`**, **`redeployment_webhook_secret`** (all optional for **`inherit`**; TMD-only callers pass **`REDEPLOYMENT_WEBHOOK_PORT`** + **`redeployment_webhook_secret`** explicitly).
 
 ## [0.1.5] - 2026-04-28
 

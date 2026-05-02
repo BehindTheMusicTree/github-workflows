@@ -53,10 +53,11 @@ Triggers a server redeployment webhook. Validates configuration, ensures `env` i
 
 **Workflow file:** `.github/workflows/call-redeployment-webhook.yml`
 
-| Input    | Required | Description                                                                                        |
-| -------- | -------- | -------------------------------------------------------------------------------------------------- |
-| `env`    | Yes      | `prod` or `staging` (lowercase)                                                                    |
-| `images` | No       | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`. |
+| Input          | Required | Description                                                                                         |
+| -------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `env`          | Yes      | `prod` or `staging` (lowercase)                                                                     |
+| `images`       | No       | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`. |
+| `hook_id_base` | Yes      | Hook id for **`/hooks/<hook_id_base>-<env>`** (trimmed). **`X-Secret`**: if this equals **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** (trimmed, var non-empty), use **`TMD_ADMIN_WEBHOOK_SECRET_<env>`**; else **`REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Use distinct hook id bases for BTMT vs TMD on the same repo. |
 
 ### Sync env to server
 
@@ -119,11 +120,14 @@ jobs:
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
       env: "staging" # or "prod"
+      hook_id_base: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
       images: "{}" # optional: {"gateway_image": "user/repo:tag"}
     secrets: inherit
 ```
 
-App repos (**BTMT**, **the-music-deck-admin**, etc.) use the same snippet; only **`REDEPLOYMENT_HOOK_ID_BASE`** and webhook secrets differ per stack.
+App repos (**BTMT**, **the-music-deck-admin**, etc.): pass **`hook_id_base: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}`** (same value you use for **`hooks.json`** / server). **The Music Deck admin** typically sets **`REDEPLOYMENT_HOOK_ID_BASE`** to the TMD hook id; **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** is optional in app repos and unused unless it matches **`hook_id_base`**.
+
+**Infrastructure (two stacks):** **BehindTheMusicTree/infrastructure** `server-setup` runs two jobs with **`secrets: inherit`**: BTMT uses **`hook_id_base: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}`**; **The Music Deck admin** uses **`hook_id_base: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** when that variable is set. The reusable workflow picks **`TMD_ADMIN_WEBHOOK_SECRET_*`** vs **`REDEPLOYMENT_WEBHOOK_SECRET_*`** by comparing **`hook_id_base`** to **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**.
 
 With dependencies (e.g. after build):
 
@@ -142,6 +146,7 @@ jobs:
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
       env: "staging"
+      hook_id_base: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
     secrets: inherit
 ```
 
@@ -167,6 +172,8 @@ This repo only contains workflow definitions. Each repository that **calls** the
 | Secret   | `REDEPLOYMENT_WEBHOOK_PORT`           | Port the webhook service listens on                                                          |
 | Secret   | `REDEPLOYMENT_WEBHOOK_SECRET_STAGING` | Webhook secret for env `staging` (X-Secret header)                                           |
 | Secret   | `REDEPLOYMENT_WEBHOOK_SECRET_PROD`    | Webhook secret for env `prod`                                                                |
+
+When **`hook_id_base`** equals **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** (repository variable, trimmed), **`X-Secret`** uses **`TMD_ADMIN_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEBHOOK_SECRET_STAGING`** instead. **Infrastructure** sets that variable for **The Music Deck admin**; other repos can leave it unset. **`REDEPLOYMENT_WEBHOOK_PORT`** is always required.
 
 ### Sync env to server
 
@@ -208,12 +215,14 @@ Required by **deploy-app-env-file**, **deploy-nginx-env-fragment**, and **deploy
 1. **Validate env**: Ensures `env` is `prod` or `staging`.
 2. **Check required config**: Validates webhook-related secrets and variables for that env.
 3. **Call webhook**: POSTs to the webhook URL (optional JSON body for image overrides).
-4. **Validate response**: Fails if the response body does not start with **`Redeployment accepted`** (same prefix as **`hooks.json`** from **BehindTheMusicTree/infrastructure** `generate-hooks-json.sh` for every stack).
+4. **Validate response**: Fails if the response body does not start with **`expected_response_prefix`** (default `Redeploying BTMT ecosystem`).
 
 ### Expected Webhook Response
 
 - **Status code**: `200 OK`
-- **Response body**: Must start with **`Redeployment accepted`** (e.g. `Redeployment accepted (staging)` is accepted).
+- **Response body**: Must start with the configured prefix:
+  - **BTMT** (default): `Redeploying BTMT ecosystem` (e.g. `Redeploying BTMT ecosystem (staging)`).
+  - **The Music Deck admin**: pass `expected_response_prefix: "Redeploying The Music Deck admin"` (matches e.g. `Redeploying The Music Deck admin (prod)`).
 
 ### Error Handling
 

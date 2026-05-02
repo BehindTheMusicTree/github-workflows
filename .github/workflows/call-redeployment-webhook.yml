@@ -1,6 +1,9 @@
 # Redeploy Webhook Call
 # Optional input images: JSON object of image overrides (e.g. {"gateway_image": "user/repo:v1", "htmt_api_image": "user/api:v2"}).
 # Server applies them before redeploy: gateway_image updates gateway .env and restarts gateway; other keys are written to scripts .env as UPPER_SNAKE_CASE.
+#
+# hook_id_base (required): POST /hooks/<hook_id_base>-<env>. X-Secret is TMD_ADMIN_WEBHOOK_SECRET_<env> when hook_id_base equals
+# vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE (trimmed, both non-empty); otherwise REDEPLOYMENT_WEBHOOK_SECRET_<env>.
 name: Redeploy Webhook Call
 
 on:
@@ -15,6 +18,10 @@ on:
         required: false
         type: string
         default: "{}"
+      hook_id_base:
+        description: "Hook id base (trimmed); URL path /hooks/<base>-<env>. Must match hooks.json (BTMT or TMD per secret rules in README)."
+        required: true
+        type: string
   workflow_call:
     inputs:
       env:
@@ -24,6 +31,26 @@ on:
         required: false
         type: string
         default: "{}"
+      hook_id_base:
+        description: "Hook id base (trimmed); e.g. vars.REDEPLOYMENT_HOOK_ID_BASE (BTMT) or vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE (TMD when that var matches)."
+        required: true
+        type: string
+    secrets:
+      REDEPLOYMENT_WEBHOOK_PORT:
+        description: Webhook daemon port on SERVER_HOST.
+        required: false
+      REDEPLOYMENT_WEBHOOK_SECRET_PROD:
+        description: X-Secret for prod when hook_id_base is not the TMD admin base.
+        required: false
+      REDEPLOYMENT_WEBHOOK_SECRET_STAGING:
+        description: X-Secret for staging when hook_id_base is not the TMD admin base.
+        required: false
+      TMD_ADMIN_WEBHOOK_SECRET_PROD:
+        description: X-Secret for TMD admin prod when hook_id_base equals vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE.
+        required: false
+      TMD_ADMIN_WEBHOOK_SECRET_STAGING:
+        description: X-Secret for TMD admin staging when hook_id_base equals vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE.
+        required: false
 
 jobs:
   validate-env:
@@ -31,8 +58,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       env_normalized: ${{ steps.normalize.outputs.env_normalized }}
+      hook_id_base_effective: ${{ steps.normalize.outputs.hook_id_base_effective }}
     steps:
-      - name: Validate env
+      - name: Validate env and hook id base
         id: normalize
         run: |
           env="${{ inputs.env }}"
@@ -45,7 +73,14 @@ jobs:
             echo "ERROR: env must be 'prod' or 'staging' (got: $env)."
             exit 1
           fi
+          hb_raw="${{ inputs.hook_id_base }}"
+          hb_trim=$(echo -n "$hb_raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          if [[ -z "$hb_trim" ]]; then
+            echo "ERROR: hook_id_base is required and must be non-empty after trim."
+            exit 1
+          fi
           echo "env_normalized=$env_lower" >> "$GITHUB_OUTPUT"
+          echo "hook_id_base_effective=$hb_trim" >> "$GITHUB_OUTPUT"
         shell: bash
 
   check-required-config:
@@ -58,21 +93,37 @@ jobs:
       - name: Check required vars and secrets
         env:
           ENV: ${{ needs.validate-env.outputs.env_normalized }}
+          HOOK_BASE: ${{ needs.validate-env.outputs.hook_id_base_effective }}
           SERVER_HOST: ${{ vars.SERVER_HOST }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
-          REDEPLOYMENT_HOOK_ID_BASE: ${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}
-          REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD || secrets.REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
+          TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}
+          REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
+          REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
+          TMD_ADMIN_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_PROD }}
+          TMD_ADMIN_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_STAGING }}
         run: |
+          trim() { echo -n "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
           missing=""
-          [[ -z "$SERVER_HOST" ]] && missing="${missing} SERVER_HOST"
-          [[ -z "$REDEPLOYMENT_WEBHOOK_PORT" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT"
-          [[ -z "$REDEPLOYMENT_HOOK_ID_BASE" ]] && missing="${missing} REDEPLOYMENT_HOOK_ID_BASE"
-          case "$ENV" in
-            prod) sec_name=REDEPLOYMENT_WEBHOOK_SECRET_PROD ;;
-            staging) sec_name=REDEPLOYMENT_WEBHOOK_SECRET_STAGING ;;
-            *) sec_name="REDEPLOYMENT_WEBHOOK_SECRET_<env>" ;;
-          esac
-          [[ -z "$REDEPLOYMENT_WEBHOOK_SECRET" ]] && missing="${missing} $sec_name"
+          [[ -z "${SERVER_HOST:-}" ]] && missing="${missing} SERVER_HOST"
+          [[ -z "${REDEPLOYMENT_WEBHOOK_PORT:-}" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT"
+          [[ -z "${HOOK_BASE:-}" ]] && missing="${missing} hook_id_base"
+          tmd_ref=$(trim "${TMD_HOOK_VAR:-}")
+          hook_trim=$(trim "${HOOK_BASE:-}")
+          use_tmd=false
+          if [[ -n "$tmd_ref" && "$hook_trim" == "$tmd_ref" ]]; then
+            use_tmd=true
+          fi
+          if [[ "$use_tmd" == true ]]; then
+            case "$ENV" in
+              prod) [[ -z "${TMD_ADMIN_WEBHOOK_SECRET_PROD:-}" ]] && missing="${missing} TMD_ADMIN_WEBHOOK_SECRET_PROD" ;;
+              staging) [[ -z "${TMD_ADMIN_WEBHOOK_SECRET_STAGING:-}" ]] && missing="${missing} TMD_ADMIN_WEBHOOK_SECRET_STAGING" ;;
+            esac
+          else
+            case "$ENV" in
+              prod) [[ -z "${REDEPLOYMENT_WEBHOOK_SECRET_PROD:-}" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET_PROD" ;;
+              staging) [[ -z "${REDEPLOYMENT_WEBHOOK_SECRET_STAGING:-}" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_SECRET_STAGING" ;;
+            esac
+          fi
           if [[ -n "$missing" ]]; then
             echo "ERROR: Missing required config:$missing"
             echo "Set variables and secrets in Settings → Environments (or org/repo level). See README."
@@ -90,10 +141,36 @@ jobs:
     steps:
       - name: Call redeploy webhook
         env:
-          SERVER_REDEPLOYMENT_WEBHOOK_URL: http://${{ vars.SERVER_HOST }}:${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}/hooks/${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}-${{ needs.validate-env.outputs.env_normalized }}
-          REDEPLOYMENT_WEBHOOK_SECRET: ${{ needs.validate-env.outputs.env_normalized == 'prod' && secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD || secrets.REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
+          ENV: ${{ needs.validate-env.outputs.env_normalized }}
+          HOOK_BASE: ${{ needs.validate-env.outputs.hook_id_base_effective }}
+          SERVER_HOST: ${{ vars.SERVER_HOST }}
+          REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
+          TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}
+          REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
+          REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
+          TMD_ADMIN_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_PROD }}
+          TMD_ADMIN_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_STAGING }}
           IMAGES_PAYLOAD: ${{ inputs.images }}
         run: |
+          trim() { echo -n "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+          tmd_ref=$(trim "${TMD_HOOK_VAR:-}")
+          hook_trim=$(trim "${HOOK_BASE:-}")
+          if [[ -n "$tmd_ref" && "$hook_trim" == "$tmd_ref" ]]; then
+            case "$ENV" in
+              prod) secret="${TMD_ADMIN_WEBHOOK_SECRET_PROD}" ;;
+              staging) secret="${TMD_ADMIN_WEBHOOK_SECRET_STAGING}" ;;
+              *) echo "ERROR: invalid ENV"; exit 1 ;;
+            esac
+          else
+            case "$ENV" in
+              prod) secret="${REDEPLOYMENT_WEBHOOK_SECRET_PROD}" ;;
+              staging) secret="${REDEPLOYMENT_WEBHOOK_SECRET_STAGING}" ;;
+              *) echo "ERROR: invalid ENV"; exit 1 ;;
+            esac
+          fi
+          SERVER_REDEPLOYMENT_WEBHOOK_URL="http://${SERVER_HOST}:${REDEPLOYMENT_WEBHOOK_PORT}/hooks/${hook_trim}-${ENV}"
+          export SERVER_REDEPLOYMENT_WEBHOOK_URL
+          export REDEPLOYMENT_WEBHOOK_SECRET="$secret"
           set +e
           response=$(curl -s -w '\n%{http_code}' -v \
             -X POST \
@@ -117,7 +194,7 @@ jobs:
             echo "ERROR: Webhook call failed with response: $response"
             echo "Expected response body to start with: $expected_prefix"
             if [[ "$response" == "Hook not found." ]] || [[ "$http_code" == "404" ]]; then
-              echo "REDEPLOYMENT_HOOK_ID_BASE + '-' + env must match the hook id in hooks.json (path is /hooks/<id>-<env>)."
+              echo "hook_id_base + '-' + env must match a hook id in hooks.json (path is /hooks/<id>-<env>)."
             fi
             exit 1
           fi
