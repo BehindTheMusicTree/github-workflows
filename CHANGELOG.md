@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-05-03
+
+
 - **typo**: rename **`TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE`** to **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**
 
 ## [1.0.1] - 2026-05-03
