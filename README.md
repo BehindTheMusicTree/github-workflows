@@ -53,11 +53,11 @@ Triggers a server redeployment webhook. Validates configuration, ensures `env` i
 
 **Workflow file:** `.github/workflows/call-redeployment-webhook.yml`
 
-| Input          | Required | Description                                                                                                                                                                                                                                                                                                                     |
-| -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `env`          | Yes      | `prod` or `staging` (lowercase)                                                                                                                                                                                                                                                                                                 |
-| `images`       | No       | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`.                                                                                                                                                                                                                              |
-| `hook_id_base` | Yes      | Hook id for **`/hooks/<hook_id_base>-<env>`** (trimmed). **`X-Secret`**: if this equals **`vars.TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE`** (trimmed, var non-empty), use **`TMD_ADMIN_WEBHOOK_SECRET_<env>`**; else **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Use distinct hook id bases for BTMT vs TMD on the same repo. |
+| Input          | Required | Description                                                                                                                                                                                                                                                                                                                |
+| -------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `env`          | Yes      | `prod` or `staging` (lowercase)                                                                                                                                                                                                                                                                                            |
+| `images`       | No       | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`.                                                                                                                                                                                                                         |
+| `hook_id_base` | Yes      | Hook id for **`/hooks/<hook_id_base>-<env>`** (trimmed). **`X-Secret`**: if this equals **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** (trimmed, var non-empty), use **`TMD_ADMIN_WEBHOOK_SECRET_<env>`**; else **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Use distinct hook id bases for BTMT vs TMD on the same repo. |
 
 ### Sync env to server
 
@@ -125,9 +125,9 @@ jobs:
     secrets: inherit
 ```
 
-App repos (**BTMT**, **the-music-deck-admin**, etc.): pass **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`** (same value you use for **`hooks.json`** / server). **The Music Deck admin** typically sets **`BTMT_REDEPLOYMENT_HOOK_ID_BASE`** to the TMD hook id; **`TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE`** is optional in app repos and unused unless it matches **`hook_id_base`**.
+App repos (**BTMT**, **the-music-deck-admin**, etc.): pass **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`** (same value you use for **`hooks.json`** / server). **The Music Deck admin** typically sets **`BTMT_REDEPLOYMENT_HOOK_ID_BASE`** to the TMD hook id; **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** is optional in app repos and unused unless it matches **`hook_id_base`**.
 
-**Infrastructure (two stacks):** **BehindTheMusicTree/infrastructure** `server-setup` runs two jobs with **`secrets: inherit`**: BTMT uses **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`**; **The Music Deck admin** uses **`hook_id_base: ${{ vars.TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`** when that variable is set. The reusable workflow picks **`TMD_ADMIN_WEBHOOK_SECRET_*`** vs **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_*`** by comparing **`hook_id_base`** to **`vars.TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE`**.
+**Infrastructure (two stacks):** **BehindTheMusicTree/infrastructure** `server-setup` runs two jobs with **`secrets: inherit`**: BTMT uses **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`**; **The Music Deck admin** uses **`hook_id_base: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** when that variable is set. The reusable workflow picks **`TMD_ADMIN_WEBHOOK_SECRET_*`** vs **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_*`** by comparing **`hook_id_base`** to **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**.
 
 With dependencies (e.g. after build):
 
@@ -173,7 +173,7 @@ This repo only contains workflow definitions. Each repository that **calls** the
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING` | Webhook secret for BTMT env `staging` (X-Secret header)                                           |
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD`    | Webhook secret for BTMT env `prod`                                                                |
 
-When **`hook_id_base`** equals **`TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE`** (repository variable, trimmed), **`X-Secret`** uses **`TMD_ADMIN_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEBHOOK_SECRET_STAGING`** instead. **Infrastructure** sets that variable for **The Music Deck admin**; other repos can leave it unset. **`REDEPLOYMENT_WEBHOOK_PORT`** is always required.
+When **`hook_id_base`** equals **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** (repository variable, trimmed), **`X-Secret`** uses **`TMD_ADMIN_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEBHOOK_SECRET_STAGING`** instead. **Infrastructure** sets that variable for **The Music Deck admin**; other repos can leave it unset. **`REDEPLOYMENT_WEBHOOK_PORT`** is always required.
 
 ### Sync env to server
 
