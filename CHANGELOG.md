@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-03
+
+
 - **call-redeployment-webhook**: Rename _`REDEPLOYMENT_HOOK_ID_BASE`_ to _`BTMT_REDEPLOYMENT_HOOK_ID_BASE`_ for BTMT stack.
 
 ## [0.3.0] - 2026-05-02
