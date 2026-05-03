@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-05-03
+
+
 ### Fixed
 
 - **release.sh**: Release bumps now use the semver-wise maximum of **`VERSION`** and the latest matching **`v*.*.*`** tag as the current version (instead of the file alone). Emits a warning when **`VERSION`** lags behind tags so patch/minor bumps match published releases and the summary reflects the real base.
