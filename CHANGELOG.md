@@ -52,6 +52,12 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-05-02
+
+### Documentation
+
+- **README** / **`workflow_call`** input description: BTMT main stack uses repository variable **`BTMT_REDEPLOYMENT_HOOK_ID_BASE`** (matches **BehindTheMusicTree/infrastructure**); **The Music Deck admin** stays **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**. Reverts **v1.0.3** docs that referenced **`BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**.
+
 ## [1.0.3] - 2026-05-02
 
 ### Fixed

@@ -32,7 +32,7 @@ on:
         type: string
         default: "{}"
       hook_id_base:
-        description: "Hook id base (trimmed); e.g. vars.BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE or vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE (TMD when that var matches)."
+        description: "Hook id base (trimmed); e.g. vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE or vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE (TMD when that var matches)."
         required: true
         type: string
     secrets:
