@@ -52,8 +52,17 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
-## [1.0.2] - 2026-05-03
+## [1.0.3] - 2026-05-02
 
+### Fixed
+
+- **call-redeployment-webhook**: TMD admin **staging** branch now reads **`TMD_ADMIN_WEBHOOK_SECRET_STAGING`** correctly in the POST step (broken env reference).
+
+### Documentation
+
+- **README** / **`workflow_call`** input description: Document repository variable **`BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** for BTMT (aligned with **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** for The Music Deck admin). Behavior unchanged: **`hook_id_base`** must still match the id base registered in **`hooks.json`**.
+
+## [1.0.2] - 2026-05-03
 
 - **typo**: rename **`TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE`** to **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**
 

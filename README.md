@@ -120,14 +120,16 @@ jobs:
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
       env: "staging" # or "prod"
-      hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}
+      hook_id_base: ${{ vars.BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}
       images: "{}" # optional: {"gateway_image": "user/repo:tag"}
     secrets: inherit
 ```
 
-App repos (**BTMT**, **the-music-deck-admin**, etc.): pass **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`** (same value you use for **`hooks.json`** / server). **The Music Deck admin** typically sets **`BTMT_REDEPLOYMENT_HOOK_ID_BASE`** to the TMD hook id; **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** is optional in app repos and unused unless it matches **`hook_id_base`**.
+**BTMT main stack** (e.g. hear-the-music-tree-api): pass **`hook_id_base: ${{ vars.BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** — same base string as in **`hooks.json`** on the server (from **BehindTheMusicTree/infrastructure** Server setup / Ansible).
 
-**Infrastructure (two stacks):** **BehindTheMusicTree/infrastructure** `server-setup` runs two jobs with **`secrets: inherit`**: BTMT uses **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`**; **The Music Deck admin** uses **`hook_id_base: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** when that variable is set. The reusable workflow picks **`TMD_ADMIN_WEBHOOK_SECRET_*`** vs **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_*`** by comparing **`hook_id_base`** to **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**.
+**the-music-deck-admin**: pass **`hook_id_base: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** (must match infra); **`call-redeployment-webhook`** chooses **`TMD_ADMIN_WEBHOOK_SECRET_*`** when **`hook_id_base`** equals **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**, otherwise **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_*`**.
+
+**Infrastructure (two stacks):** **BehindTheMusicTree/infrastructure** `server-setup` runs two jobs with **`secrets: inherit`**: BTMT uses **`hook_id_base: ${{ vars.BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`**; **The Music Deck admin** uses **`hook_id_base: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** when that variable is set.
 
 With dependencies (e.g. after build):
 
@@ -146,7 +148,7 @@ jobs:
     uses: BehindTheMusicTree/github-workflows/.github/workflows/call-redeployment-webhook.yml@main
     with:
       env: "staging"
-      hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}
+      hook_id_base: ${{ vars.BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}
     secrets: inherit
 ```
 
@@ -168,7 +170,7 @@ This repo only contains workflow definitions. Each repository that **calls** the
 | Type     | Name                                       | Description                                                                                       |
 | -------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | Variable | `SERVER_HOST`                              | VPS IP or hostname for webhook URL (use when main domain points elsewhere, e.g. Vercel)           |
-| Variable | `BTMT_REDEPLOYMENT_HOOK_ID_BASE`           | Base hook id; URL path is `/hooks/<BTMT_REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `myhook-staging`) |
+| Variable | `BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`           | Base hook id; URL path is `/hooks/<BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `myhook-staging`) |
 | Secret   | `REDEPLOYMENT_WEBHOOK_PORT`                | Port the webhook service listens on                                                               |
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING` | Webhook secret for BTMT env `staging` (X-Secret header)                                           |
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD`    | Webhook secret for BTMT env `prod`                                                                |
@@ -238,10 +240,10 @@ The webhook workflow fails with clear errors if:
 The workflow builds the URL using **SERVER_HOST** (the webhook runs on the VPS; use VPS IP when the main domain points elsewhere, e.g. Vercel):
 
 ```
-http://<SERVER_HOST>:<REDEPLOYMENT_WEBHOOK_PORT>/hooks/<BTMT_REDEPLOYMENT_HOOK_ID_BASE>-<env>
+http://<SERVER_HOST>:<REDEPLOYMENT_WEBHOOK_PORT>/hooks/<BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE>-<env>
 ```
 
-Example: `SERVER_HOST=203.0.113.10`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `BTMT_REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=staging`  
+Example: `SERVER_HOST=203.0.113.10`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=staging`  
 → `http://203.0.113.10:9000/hooks/btmt-redeploy-staging`
 
 Manual check (use the secret for the env you target):
@@ -263,13 +265,13 @@ curl -v -X POST -H "Content-Type: application/json" -H "X-Secret: YOUR_SECRET" -
 
 - Set all required secrets and variables for the environment you use (`staging` or `prod`)
 - Use `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING` and `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD` (not a single combined secret name)
-- Ensure `BTMT_REDEPLOYMENT_HOOK_ID_BASE` is set; the hook path is `<BTMT_REDEPLOYMENT_HOOK_ID_BASE>-<env>`
+- Ensure `BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE` is set; the hook path is `<BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE>-<env>`
 
 ### "Webhook call failed" / "Connection refused" Error
 
 - Ensure the webhook service is running on the server: `systemctl status webhook`
 - Check port and firewall; `REDEPLOYMENT_WEBHOOK_PORT` must match the server
-- In `hooks.json`, the hook id must be `<BTMT_REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `btmt-redeploy-staging`)
+- In `hooks.json`, the hook id must be `<BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `btmt-redeploy-staging`)
 - Verify the X-Secret header matches the secret for that env (`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING` or `_PROD`)
 
 ### "Artifact not found" when calling deploy workflows from another repo
