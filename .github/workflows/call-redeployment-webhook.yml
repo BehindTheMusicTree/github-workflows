@@ -3,7 +3,7 @@
 # Server applies them before redeploy: gateway_image updates gateway .env and restarts gateway; other keys are written to scripts .env as UPPER_SNAKE_CASE.
 #
 # hook_id_base (required): POST /hooks/<hook_id_base>-<env>. X-Secret is TMD_ADMIN_WEBHOOK_SECRET_<env> when hook_id_base equals
-# vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE (trimmed, both non-empty); otherwise BTMT_REDEPLOYMENT_WEBHOOK_SECRET_<env>.
+# vars.TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE (trimmed, both non-empty); otherwise BTMT_REDEPLOYMENT_WEBHOOK_SECRET_<env>.
 name: Redeploy Webhook Call
 
 on:
@@ -32,7 +32,7 @@ on:
         type: string
         default: "{}"
       hook_id_base:
-        description: "Hook id base (trimmed); e.g. vars.REDEPLOYMENT_HOOK_ID_BASE (BTMT) or vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE (TMD when that var matches)."
+        description: "Hook id base (trimmed); e.g. vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE or vars.TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE (TMD when that var matches)."
         required: true
         type: string
     secrets:
@@ -46,10 +46,10 @@ on:
         description: X-Secret for BTMT staging when hook_id_base is not the TMD admin base.
         required: false
       TMD_ADMIN_WEBHOOK_SECRET_PROD:
-        description: X-Secret for TMD admin prod when hook_id_base equals vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE.
+        description: X-Secret for TMD admin prod when hook_id_base equals vars.TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE.
         required: false
       TMD_ADMIN_WEBHOOK_SECRET_STAGING:
-        description: X-Secret for TMD admin staging when hook_id_base equals vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE.
+        description: X-Secret for TMD admin staging when hook_id_base equals vars.TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE.
         required: false
 
 jobs:
@@ -96,7 +96,7 @@ jobs:
           HOOK_BASE: ${{ needs.validate-env.outputs.hook_id_base_effective }}
           SERVER_HOST: ${{ vars.SERVER_HOST }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
-          TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}
+          TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE }}
           BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
           BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
           TMD_ADMIN_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_PROD }}
@@ -145,7 +145,7 @@ jobs:
           HOOK_BASE: ${{ needs.validate-env.outputs.hook_id_base_effective }}
           SERVER_HOST: ${{ vars.SERVER_HOST }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
-          TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}
+          TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE }}
           BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
           BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
           TMD_ADMIN_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_PROD }}
