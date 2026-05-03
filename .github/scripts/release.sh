@@ -11,7 +11,7 @@ Example:
   .github/scripts/release.sh minor
 
 This script:
-  0) Computes next semver from VERSION using bump type
+  0) Computes next semver from max(VERSION, latest vMAJOR.MINOR.PATCH tag) using bump type
   1) Adds a new release section under [Unreleased] in CHANGELOG.md
   2) Bumps VERSION
   3) Creates a commit
@@ -60,7 +60,27 @@ if [[ ! "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 
-IFS='.' read -r major minor patch <<< "$current_version"
+latest_tag="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1)"
+latest_tag_version=""
+if [[ -n "$latest_tag" ]]; then
+  latest_tag_version="${latest_tag#v}"
+  if [[ ! "$latest_tag_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    latest_tag_version=""
+    latest_tag=""
+  fi
+fi
+
+effective_version="$current_version"
+if [[ -n "$latest_tag_version" ]]; then
+  effective_version="$(printf '%s\n%s' "$current_version" "$latest_tag_version" | sort -V | tail -n1)"
+fi
+
+if [[ "$effective_version" != "$current_version" ]]; then
+  echo "WARNING: VERSION file (${current_version}) is behind latest tag (${latest_tag} -> ${latest_tag_version})." >&2
+  echo "WARNING: Release bump uses ${effective_version} as the current version (keep VERSION in sync with tags)." >&2
+fi
+
+IFS='.' read -r major minor patch <<< "$effective_version"
 case "$bump_type" in
   major)
     major=$((major + 1))
@@ -160,6 +180,6 @@ git tag "$tag"
 git push origin "$tag"
 
 echo "Release prepared."
-echo "- VERSION: ${current_version} -> ${version}"
+echo "- Version: ${effective_version} -> ${version} (VERSION file before bump: ${current_version})"
 echo "- Tag created and pushed: ${tag}"
 echo "- Commit created locally (not pushed): chore(release): ${tag}"
