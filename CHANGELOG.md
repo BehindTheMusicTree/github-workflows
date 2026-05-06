@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-06
+
+
 ### Added
 
 - **set-image-tags-on-server**: New reusable workflow `.github/workflows/set-image-tags-on-server.yml` writes one atomic pooled manifest per stack/env (`/srv/btmt/image-tags/<stack>-<env>.tags.env`) from multiline `KEY=VALUE` input, with optional `RELEASE_ID` / `RELEASE_SHA` metadata.
