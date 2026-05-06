@@ -1,6 +1,6 @@
 # App-agnostic reusable workflow: transfer an env fragment (from caller artifact) to the server and merge into scripts/.env.
 # Caller builds the fragment in its repo (app-specific keys), uploads it as an artifact, then calls this workflow.
-# Path from caller vars: SERVER_HOST, REDEPLOYMENT_ROOT (org pool, e.g. /var/webhook/redeployment).
+# Path from caller vars: SERVER_HOST, REDEPLOYMENT_ROOT (required; no fallback).
 name: Sync env to server
 
 on:
@@ -90,7 +90,6 @@ jobs:
           fi
           FRAGMENT_BASE="${SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE:-sync-env-}${APP_NAME}"
           scp -o StrictHostKeyChecking=accept-new "$FRAGMENT_FILE" "$SSH_DESTINATION:/tmp/${FRAGMENT_BASE}-$SYNC_ENV.env"
-          REDEPLOYMENT_ROOT="${REDEPLOYMENT_ROOT:-/var/webhook/redeployment}"
           ssh "$SSH_DESTINATION" "bash -s" -- "$REDEPLOYMENT_ROOT" "$SYNC_ENV" "$FRAGMENT_BASE" << 'REMOTE'
           REDEPLOYMENT_ROOT="$1"
           env="$2"

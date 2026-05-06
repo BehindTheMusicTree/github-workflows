@@ -1,5 +1,5 @@
 # Reusable workflow: write image tag to server scripts dir for the given env and service.
-# Caller must have var REDEPLOYMENT_ROOT (org pool, e.g. /var/webhook/redeployment), SERVER_HOST,
+# Caller must have var REDEPLOYMENT_ROOT (required; no fallback), SERVER_HOST,
 # and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY (same as other deploy workflows).
 # Filename on server: ${app_name}-tag (e.g. htmt-api-tag, htmt-db-tag, afp-tag).
 name: Set image tag on server
@@ -27,6 +27,25 @@ jobs:
     env:
       SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.SERVER_HOST }}
     steps:
+      - name: Check required vars and secrets
+        env:
+          SERVER_HOST: ${{ vars.SERVER_HOST }}
+          REDEPLOYMENT_ROOT: ${{ vars.REDEPLOYMENT_ROOT }}
+          SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
+          SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          required=(SERVER_HOST REDEPLOYMENT_ROOT SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
+          missing=()
+          for v in "${required[@]}"; do
+            [ -z "${!v}" ] && missing+=("$v")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "ERROR: Missing required vars or secrets: ${missing[*]}"
+            echo "Set them in Settings → Secrets and variables → Actions (repo or environment)."
+            exit 1
+          fi
+          echo "All required vars and secrets are set."
+
       - name: Validate env
         id: validate
         run: |
@@ -43,7 +62,6 @@ jobs:
           REDEPLOYMENT_ROOT: ${{ vars.REDEPLOYMENT_ROOT }}
         run: |
           ENV_LC="${{ steps.validate.outputs.env_lower }}"
-          REDEPLOYMENT_ROOT="${REDEPLOYMENT_ROOT:-/var/webhook/redeployment}"
           SCRIPTS_DIR="${REDEPLOYMENT_ROOT}-${ENV_LC}/scripts/"
           echo "remote_path=${SCRIPTS_DIR}${{ inputs.app_name }}-tag" >> $GITHUB_OUTPUT
 
