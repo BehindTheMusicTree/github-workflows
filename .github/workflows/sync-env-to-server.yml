@@ -1,6 +1,6 @@
-# App-agnostic reusable workflow: transfer an env fragment (from caller artifact) to the server and merge into scripts/.env.
-# Caller builds the fragment in its repo (app-specific keys), uploads it as an artifact, then calls this workflow.
-# Path from caller vars: SERVER_HOST, REDEPLOYMENT_ROOT (required; no fallback).
+# App-agnostic reusable workflow: upload an env fragment into ENV_POOL_DIR on the server (atomic write).
+# Redeploy promotes pool → scripts/sync-env/ via promote-sync-env-to-canonical.sh (BTMT/TMD).
+# Caller vars: SERVER_HOST, ENV_POOL_DIR (+ optional SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE).
 name: Sync env to server
 
 on:
@@ -25,18 +25,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.SERVER_HOST }}
-      REDEPLOYMENT_ROOT: ${{ vars.REDEPLOYMENT_ROOT }}
+      ENV_POOL_DIR: ${{ vars.ENV_POOL_DIR }}
       SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE: ${{ vars.SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE }}
       APP_NAME: ${{ inputs.app_name }}
     steps:
       - name: Check required vars and secrets
         env:
           SERVER_HOST: ${{ vars.SERVER_HOST }}
-          REDEPLOYMENT_ROOT: ${{ vars.REDEPLOYMENT_ROOT }}
+          ENV_POOL_DIR: ${{ vars.ENV_POOL_DIR }}
           SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
           SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
         run: |
-          required=(SERVER_HOST REDEPLOYMENT_ROOT SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
+          required=(SERVER_HOST ENV_POOL_DIR SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
           missing=()
           for v in "${required[@]}"; do
             [ -z "${!v}" ] && missing+=("$v")
@@ -73,7 +73,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Upload fragment and merge into server .env (${{ inputs.sync_env }})
+      - name: Upload fragment to env pool (${{ inputs.sync_env }})
         env:
           SYNC_ENV: ${{ inputs.sync_env }}
         run: |
@@ -89,27 +89,18 @@ jobs:
             exit 1
           fi
           FRAGMENT_BASE="${SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE:-sync-env-}${APP_NAME}"
-          scp -o StrictHostKeyChecking=accept-new "$FRAGMENT_FILE" "$SSH_DESTINATION:/tmp/${FRAGMENT_BASE}-$SYNC_ENV.env"
-          ssh "$SSH_DESTINATION" "bash -s" -- "$REDEPLOYMENT_ROOT" "$SYNC_ENV" "$FRAGMENT_BASE" << 'REMOTE'
-          REDEPLOYMENT_ROOT="$1"
-          env="$2"
-          prefix="$3"
-          FRAGMENT="/tmp/${prefix}-${env}.env"
-          scripts_dir="${REDEPLOYMENT_ROOT}-${env}/scripts"
-          env_file="${scripts_dir}/.env"
-          if [ ! -f "$env_file" ]; then
-            echo "ERROR: $env_file not found"
-            exit 1
-          fi
-          tmp=$(mktemp)
-          while IFS= read -r line; do
-            [[ -z "$line" || "$line" =~ ^# ]] && continue
-            key="${line%%=*}"
-            grep -v "^${key}=" "$env_file" > "$tmp" 2>/dev/null || true
-            echo "$line" >> "$tmp"
-            mv "$tmp" "$env_file"
-            tmp=$(mktemp)
-          done < "$FRAGMENT"
-          rm -f "$tmp"
-          echo "Updated $env_file; app env file left at $FRAGMENT for redeploy"
+          REMOTE_FRAGMENT_PATH="${ENV_POOL_DIR%/}/${FRAGMENT_BASE}-${SYNC_ENV}.env"
+          REMOTE_FRAGMENT_TMP="${REMOTE_FRAGMENT_PATH}.new"
+          scp -o StrictHostKeyChecking=accept-new "$FRAGMENT_FILE" "$SSH_DESTINATION:$REMOTE_FRAGMENT_TMP"
+          ssh "$SSH_DESTINATION" "bash -s" -- "$SYNC_ENV" "$FRAGMENT_BASE" "$ENV_POOL_DIR" << 'REMOTE'
+          set -euo pipefail
+          env="$1"
+          prefix="$2"
+          env_pool_dir="$3"
+          FRAGMENT="${env_pool_dir%/}/${prefix}-${env}.env"
+          mkdir -p "${env_pool_dir%/}"
+          chmod 0750 "${env_pool_dir%/}" || true
+          chmod 0600 "${FRAGMENT}.new" || true
+          mv -f "${FRAGMENT}.new" "$FRAGMENT"
+          echo "Wrote pooled fragment: $FRAGMENT (redeploy will promote to scripts/sync-env/)"
           REMOTE

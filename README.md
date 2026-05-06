@@ -78,7 +78,7 @@ Required caller config: `vars.SERVER_HOST`, `vars.IMAGE_TAGS_POOL_DIR` (e.g. `/s
 
 ### Sync env to server
 
-App-agnostic reusable: upload an env fragment and merge it into the server `scripts/.env` for one environment. Path and fragment content come from the **caller’s** vars and secrets (no app-specific inputs). Any app can use it by setting the required vars/secrets in its repo and calling with `secrets: inherit` and the right `environment`.
+App-agnostic reusable: upload an env fragment into **`ENV_POOL_DIR`** on the server (atomic write). Redeploy (**BehindTheMusicTree/infrastructure**) promotes pool → **`scripts/sync-env/`** via **`promote-sync-env-to-canonical.sh`**; compose generators read canonical sync-env files, not merged keys in **`scripts/.env`**.
 
 **Workflow file:** `.github/workflows/sync-env-to-server.yml`
 
@@ -88,7 +88,7 @@ App-agnostic reusable: upload an env fragment and merge it into the server `scri
 | `app_name`          | Yes      | App name for fragment path (e.g. `htmt-api`)                                            |
 | `fragment_artifact` | Yes      | Artifact name and path to fragment file (e.g. `sync-env-fragment-staging/fragment.env`) |
 
-**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact` (e.g. `sync-env-fragment-staging/fragment.env`). Required **vars** (repo or environment): `SERVER_HOST`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`. Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`. Required **vars** (repo or environment): `SERVER_HOST`, `REDEPLOYMENT_ROOT` (e.g. `/var/webhook/redeployment`), `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
+**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact`. Required **vars** (repo or environment): `SERVER_HOST`, `ENV_POOL_DIR`, `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). Trigger **redeploy** after sync so promoted **`sync-env`** files reach **`compose/*.env`** / compose generation. To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
 
 ### Deploy App Env File
 
@@ -201,7 +201,7 @@ Required by **sync-env-to-server** (caller’s environment):
 | Type     | Name                                   | Description                                                                                                             |
 | -------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Variable | `SERVER_HOST`                          | VPS IP or hostname for SSH                                                                                              |
-| Variable | `REDEPLOYMENT_ROOT`                    | Redeployment tree root on server (e.g. `/var/webhook/redeployment`); scripts dir = `{REDEPLOYMENT_ROOT}-{env}/scripts/` |
+| Variable | `ENV_POOL_DIR`                         | Server pool directory where env fragments are stored (e.g. `/srv/btmt/env-pool`)                                      |
 | Variable | `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE` | Fragment filename prefix (e.g. `sync-env-`)                                                                             |
 | Variable | `HTMT_API_APP_NAME` or `APP_NAME`      | App name for fragment path (e.g. `htmt-api`)                                                                            |
 | Secret   | `SERVER_DEPLOY_USERNAME`               | SSH user                                                                                                                |

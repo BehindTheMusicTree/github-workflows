@@ -56,6 +56,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 - **set-image-tags-on-server**: New reusable workflow `.github/workflows/set-image-tags-on-server.yml` writes one atomic pooled manifest per stack/env (`/srv/btmt/image-tags/<stack>-<env>.tags.env`) from multiline `KEY=VALUE` input, with optional `RELEASE_ID` / `RELEASE_SHA` metadata.
 
+### Changed
+
+- **sync-env-to-server**: Removed **`redeployment_root`** **`workflow_call`** input. The workflow only writes **`${ENV_POOL_DIR}/${prefix}<app>-<env>.env`** on the server; callers rely on redeploy promotion into **`scripts/sync-env/`** (no merge into **`scripts/.env`**).
+
 ## [1.0.4] - 2026-05-02
 
 ### Documentation
