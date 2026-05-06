@@ -1,5 +1,5 @@
 # Reusable workflow: write pooled image-tag manifest for one stack and env.
-# Caller must have var SERVER_HOST and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
+# Caller must have vars SERVER_HOST and IMAGE_TAGS_POOL_DIR and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
 name: Set image tags on server
 
 on:
@@ -16,11 +16,6 @@ on:
       tags:
         description: "Multiline KEY=VALUE manifest lines (e.g. HTMT_API_TAG=staging)"
         required: true
-        type: string
-      image_tags_pool_dir:
-        description: "Pool directory on server"
-        required: false
-        default: "/srv/btmt/image-tags"
         type: string
       release_id:
         description: "Optional release identifier to store in manifest"
@@ -43,10 +38,11 @@ jobs:
       - name: Check required vars and secrets
         env:
           SERVER_HOST: ${{ vars.SERVER_HOST }}
+          IMAGE_TAGS_POOL_DIR: ${{ vars.IMAGE_TAGS_POOL_DIR }}
           SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
           SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
         run: |
-          required=(SERVER_HOST SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
+          required=(SERVER_HOST IMAGE_TAGS_POOL_DIR SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
           missing=()
           for v in "${required[@]}"; do
             [ -z "${!v}" ] && missing+=("$v")
@@ -128,7 +124,7 @@ jobs:
         env:
           ENV_LC: ${{ steps.validate.outputs.env_lower }}
           STACK: ${{ inputs.stack }}
-          IMAGE_TAGS_POOL_DIR: ${{ inputs.image_tags_pool_dir }}
+          IMAGE_TAGS_POOL_DIR: ${{ vars.IMAGE_TAGS_POOL_DIR }}
           MANIFEST_FILE: ${{ steps.manifest.outputs.manifest_file }}
         run: |
           remote_dir="${IMAGE_TAGS_POOL_DIR%/}"

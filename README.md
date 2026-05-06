@@ -71,11 +71,10 @@ Writes one pooled stack/env image-tags manifest on the server (atomic `*.new` th
 | `env`                 | Yes      | `prod` or `staging`                                                                        |
 | `stack`               | Yes      | Stack key in filename (e.g. `btmt`, `tmd-admin`)                                           |
 | `tags`                | Yes      | Multiline `KEY=VALUE` lines (e.g. `HTMT_API_TAG=staging`)                                  |
-| `image_tags_pool_dir` | No       | Server pool dir; default `/srv/btmt/image-tags`                                            |
 | `release_id`          | No       | Optional release id metadata (`RELEASE_ID=`)                                               |
 | `release_sha`         | No       | Optional git SHA metadata (`RELEASE_SHA=`)                                                 |
 
-Required caller config: `vars.SERVER_HOST`, `secrets.SERVER_DEPLOY_USERNAME`, `secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY`.
+Required caller config: `vars.SERVER_HOST`, `vars.IMAGE_TAGS_POOL_DIR` (e.g. `/srv/btmt/image-tags`), `secrets.SERVER_DEPLOY_USERNAME`, `secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY`.
 
 ### Sync env to server
 
