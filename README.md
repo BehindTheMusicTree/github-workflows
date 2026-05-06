@@ -11,6 +11,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - [Available Workflows](#available-workflows)
   - [Actionlint](#actionlint)
   - [Call Redeployment Webhook](#call-redeployment-webhook)
+  - [Set Image Tags On Server](#set-image-tags-on-server)
   - [Sync env to server](#sync-env-to-server)
   - [Deploy App Env File](#deploy-app-env-file)
   - [Deploy Nginx Env Fragment](#deploy-nginx-env-fragment)
@@ -58,6 +59,23 @@ Triggers a server redeployment webhook. Validates configuration, ensures `env` i
 | `env`          | Yes      | `prod` or `staging` (lowercase)                                                                                                                                                                                                                                                                                            |
 | `images`       | No       | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`.                                                                                                                                                                                                                         |
 | `hook_id_base` | Yes      | Hook id for **`/hooks/<hook_id_base>-<env>`** (trimmed). **`X-Secret`**: if this equals **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** (trimmed, var non-empty), use **`TMD_ADMIN_WEBHOOK_SECRET_<env>`**; else **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Use distinct hook id bases for BTMT vs TMD on the same repo. |
+
+### Set Image Tags On Server
+
+Writes one pooled stack/env image-tags manifest on the server (atomic `*.new` then `mv -f`). Use this instead of per-service `set-image-tag-on-server` calls so API/DB/AFP tags are updated in one operation.
+
+**Workflow file:** `.github/workflows/set-image-tags-on-server.yml`
+
+| Input                 | Required | Description                                                                                |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------ |
+| `env`                 | Yes      | `prod` or `staging`                                                                        |
+| `stack`               | Yes      | Stack key in filename (e.g. `btmt`, `tmd-admin`)                                           |
+| `tags`                | Yes      | Multiline `KEY=VALUE` lines (e.g. `HTMT_API_TAG=staging`)                                  |
+| `image_tags_pool_dir` | No       | Server pool dir; default `/srv/btmt/image-tags`                                            |
+| `release_id`          | No       | Optional release id metadata (`RELEASE_ID=`)                                               |
+| `release_sha`         | No       | Optional git SHA metadata (`RELEASE_SHA=`)                                                 |
+
+Required caller config: `vars.SERVER_HOST`, `secrets.SERVER_DEPLOY_USERNAME`, `secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY`.
 
 ### Sync env to server
 

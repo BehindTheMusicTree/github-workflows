@@ -1,0 +1,148 @@
+# Reusable workflow: write pooled image-tag manifest for one stack and env.
+# Caller must have var SERVER_HOST and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
+name: Set image tags on server
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: "Environment (staging or prod)"
+        required: true
+        type: string
+      stack:
+        description: "Stack name used in manifest filename (e.g. btmt, tmd-admin)"
+        required: true
+        type: string
+      tags:
+        description: "Multiline KEY=VALUE manifest lines (e.g. HTMT_API_TAG=staging)"
+        required: true
+        type: string
+      image_tags_pool_dir:
+        description: "Pool directory on server"
+        required: false
+        default: "/srv/btmt/image-tags"
+        type: string
+      release_id:
+        description: "Optional release identifier to store in manifest"
+        required: false
+        default: ""
+        type: string
+      release_sha:
+        description: "Optional git SHA to store in manifest"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  set-tags:
+    name: Set image tags manifest on server
+    runs-on: ubuntu-latest
+    env:
+      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.SERVER_HOST }}
+    steps:
+      - name: Check required vars and secrets
+        env:
+          SERVER_HOST: ${{ vars.SERVER_HOST }}
+          SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
+          SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          required=(SERVER_HOST SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
+          missing=()
+          for v in "${required[@]}"; do
+            [ -z "${!v}" ] && missing+=("$v")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "ERROR: Missing required vars or secrets: ${missing[*]}"
+            echo "Set them in Settings → Secrets and variables → Actions (repo or environment)."
+            exit 1
+          fi
+          echo "All required vars and secrets are set."
+
+      - name: Validate inputs
+        id: validate
+        env:
+          INPUT_ENV: ${{ inputs.env }}
+          INPUT_STACK: ${{ inputs.stack }}
+          INPUT_TAGS: ${{ inputs.tags }}
+        run: |
+          env_lower=$(echo "$INPUT_ENV" | tr '[:upper:]' '[:lower:]')
+          if [[ "$env_lower" != "prod" && "$env_lower" != "staging" ]]; then
+            echo "ERROR: env must be 'prod' or 'staging' (got: $INPUT_ENV)."
+            exit 1
+          fi
+          if [[ ! "$INPUT_STACK" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            echo "ERROR: stack must match ^[a-z0-9][a-z0-9-]*$ (got: $INPUT_STACK)."
+            exit 1
+          fi
+          if [ -z "$INPUT_TAGS" ]; then
+            echo "ERROR: tags input must not be empty."
+            exit 1
+          fi
+          while IFS= read -r line || [ -n "$line" ]; do
+            [[ -z "$line" || "$line" =~ ^# ]] && continue
+            if [[ ! "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*=.+$ ]]; then
+              echo "ERROR: invalid tags line '$line' (must be KEY=VALUE with shell-safe KEY)."
+              exit 1
+            fi
+            key="${line%%=*}"
+            value="${line#*=}"
+            value="${value//$'\r'/}"
+            if [ -z "$value" ] || [ "$value" = "latest" ]; then
+              echo "ERROR: '$key' value must be non-empty and not 'latest'."
+              exit 1
+            fi
+          done <<< "$INPUT_TAGS"
+          echo "env_lower=$env_lower" >> "$GITHUB_OUTPUT"
+
+      - uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Build manifest file
+        id: manifest
+        env:
+          TAGS: ${{ inputs.tags }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          manifest_file="$(mktemp)"
+          {
+            echo "# managed by set-image-tags-on-server"
+            echo "RELEASED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            if [ -n "$RELEASE_ID" ]; then
+              echo "RELEASE_ID=$RELEASE_ID"
+            fi
+            if [ -n "$RELEASE_SHA" ]; then
+              echo "RELEASE_SHA=$RELEASE_SHA"
+            fi
+            printf "%s\n" "$TAGS"
+          } > "$manifest_file"
+          echo "manifest_file=$manifest_file" >> "$GITHUB_OUTPUT"
+
+      - name: Upload manifest and atomically promote
+        env:
+          ENV_LC: ${{ steps.validate.outputs.env_lower }}
+          STACK: ${{ inputs.stack }}
+          IMAGE_TAGS_POOL_DIR: ${{ inputs.image_tags_pool_dir }}
+          MANIFEST_FILE: ${{ steps.manifest.outputs.manifest_file }}
+        run: |
+          remote_dir="${IMAGE_TAGS_POOL_DIR%/}"
+          remote_file="${remote_dir}/${STACK}-${ENV_LC}.tags.env"
+          remote_tmp="${remote_file}.new"
+          scp -o StrictHostKeyChecking=accept-new "$MANIFEST_FILE" "$SSH_DESTINATION:$remote_tmp"
+          ssh "$SSH_DESTINATION" "bash -s" -- "$remote_dir" "$remote_file" "$remote_tmp" << 'REMOTE'
+          set -euo pipefail
+          remote_dir="$1"
+          remote_file="$2"
+          remote_tmp="$3"
+          mkdir -p "$remote_dir" "$remote_dir/archive"
+          chmod 0750 "$remote_dir" "$remote_dir/archive" || true
+          chmod 0640 "$remote_tmp" || true
+          mv -f "$remote_tmp" "$remote_file"
+          echo "Wrote pooled image-tag manifest: $remote_file"
+          REMOTE
