@@ -4,7 +4,7 @@
 #
 # hook_id_base (required): POST /hooks/<hook_id_base>-<env>. X-Secret selection (trimmed, all non-empty):
 #   hook_id_base == vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE          → BTMT_REDEPLOYMENT_WEBHOOK_SECRET_<env>
-#   hook_id_base == vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE     → TMD_ADMIN_WEBHOOK_SECRET_<env>
+#   hook_id_base == vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE     → TMD_ADMIN_API_WEBHOOK_SECRET_<env>
 #   hook_id_base == vars.TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE → TMD_ADMIN_WEB_WEBHOOK_SECRET_<env>
 #   no match                                                      → error (no fallback)
 name: Redeploy Webhook Call
@@ -48,10 +48,10 @@ on:
       BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING:
         description: X-Secret for BTMT staging when hook_id_base equals vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE.
         required: false
-      TMD_ADMIN_WEBHOOK_SECRET_PROD:
+      TMD_ADMIN_API_WEBHOOK_SECRET_PROD:
         description: X-Secret for TMD admin prod when hook_id_base equals vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE.
         required: false
-      TMD_ADMIN_WEBHOOK_SECRET_STAGING:
+      TMD_ADMIN_API_WEBHOOK_SECRET_STAGING:
         description: X-Secret for TMD admin staging when hook_id_base equals vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE.
         required: false
       TMD_ADMIN_WEB_WEBHOOK_SECRET_PROD:
@@ -110,8 +110,8 @@ jobs:
           TMD_WEB_HOOK_VAR: ${{ vars.TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE }}
           BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
           BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
-          TMD_ADMIN_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_PROD }}
-          TMD_ADMIN_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_STAGING }}
+          TMD_ADMIN_API_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_API_WEBHOOK_SECRET_PROD }}
+          TMD_ADMIN_API_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_API_WEBHOOK_SECRET_STAGING }}
           TMD_ADMIN_WEB_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEB_WEBHOOK_SECRET_PROD }}
           TMD_ADMIN_WEB_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_WEB_WEBHOOK_SECRET_STAGING }}
         run: |
@@ -135,8 +135,8 @@ jobs:
             esac
           elif [[ -n "$tmd_ref" && "$hook_trim" == "$tmd_ref" ]]; then
             case "$ENV" in
-              prod) [[ -z "${TMD_ADMIN_WEBHOOK_SECRET_PROD:-}" ]] && missing="${missing} TMD_ADMIN_WEBHOOK_SECRET_PROD" ;;
-              staging) [[ -z "${TMD_ADMIN_WEBHOOK_SECRET_STAGING:-}" ]] && missing="${missing} TMD_ADMIN_WEBHOOK_SECRET_STAGING" ;;
+              prod) [[ -z "${TMD_ADMIN_API_WEBHOOK_SECRET_PROD:-}" ]] && missing="${missing} TMD_ADMIN_API_WEBHOOK_SECRET_PROD" ;;
+              staging) [[ -z "${TMD_ADMIN_API_WEBHOOK_SECRET_STAGING:-}" ]] && missing="${missing} TMD_ADMIN_API_WEBHOOK_SECRET_STAGING" ;;
             esac
           elif [[ -n "$tmd_web_ref" && "$hook_trim" == "$tmd_web_ref" ]]; then
             case "$ENV" in
@@ -173,8 +173,8 @@ jobs:
           TMD_WEB_HOOK_VAR: ${{ vars.TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE }}
           BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD }}
           BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING: ${{ secrets.BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING }}
-          TMD_ADMIN_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_PROD }}
-          TMD_ADMIN_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_WEBHOOK_SECRET_STAGING }}
+          TMD_ADMIN_API_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_API_WEBHOOK_SECRET_PROD }}
+          TMD_ADMIN_API_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_API_WEBHOOK_SECRET_STAGING }}
           TMD_ADMIN_WEB_WEBHOOK_SECRET_PROD: ${{ secrets.TMD_ADMIN_WEB_WEBHOOK_SECRET_PROD }}
           TMD_ADMIN_WEB_WEBHOOK_SECRET_STAGING: ${{ secrets.TMD_ADMIN_WEB_WEBHOOK_SECRET_STAGING }}
           IMAGES_PAYLOAD: ${{ inputs.images }}
@@ -196,8 +196,8 @@ jobs:
             esac
           elif [[ -n "$tmd_ref" && "$hook_trim" == "$tmd_ref" ]]; then
             case "$ENV" in
-              prod) secret="${TMD_ADMIN_WEBHOOK_SECRET_PROD}" ;;
-              staging) secret="${TMD_ADMIN_WEBHOOK_SECRET_STAGING}" ;;
+              prod) secret="${TMD_ADMIN_API_WEBHOOK_SECRET_PROD}" ;;
+              staging) secret="${TMD_ADMIN_API_WEBHOOK_SECRET_STAGING}" ;;
               *) echo "ERROR: invalid ENV"; exit 1 ;;
             esac
           elif [[ -n "$tmd_web_ref" && "$hook_trim" == "$tmd_web_ref" ]]; then

@@ -54,7 +54,6 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [3.0.0] - 2026-06-04
 
-
 ### Added
 
 - **call-redeployment-webhook**: Added support for The Music Deck admin **web** app webhook
@@ -88,7 +87,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Fixed
 
-- **call-redeployment-webhook**: TMD admin **staging** branch now reads **`TMD_ADMIN_WEBHOOK_SECRET_STAGING`** correctly in the POST step (broken env reference).
+- **call-redeployment-webhook**: TMD admin **staging** branch now reads **`TMD_ADMIN_API_WEBHOOK_SECRET_STAGING`** correctly in the POST step (broken env reference).
 
 ### Documentation
 
@@ -112,13 +111,13 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Changed
 
-- **call-redeployment-webhook** (**breaking**): BTMT stack webhook secrets renamed from **`REDEPLOYMENT_WEBHOOK_SECRET_{PROD,STAGING}`** to **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_{PROD,STAGING}`** in **`workflow_call`** / **`workflow_dispatch`**. **`TMD_ADMIN_WEBHOOK_SECRET_*`** and hook selection by **`hook_id_base`** are unchanged. Callers must rename GitHub secrets (same values) and bump **`uses:`** to **`@v0.3.0`**.
+- **call-redeployment-webhook** (**breaking**): BTMT stack webhook secrets renamed from **`REDEPLOYMENT_WEBHOOK_SECRET_{PROD,STAGING}`** to **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_{PROD,STAGING}`** in **`workflow_call`** / **`workflow_dispatch`**. **`TMD_ADMIN_API_WEBHOOK_SECRET_*`** and hook selection by **`hook_id_base`** are unchanged. Callers must rename GitHub secrets (same values) and bump **`uses:`** to **`@v0.3.0`**.
 
 ## [0.2.0] - 2026-05-02
 
 ### Changed
 
-- **call-redeployment-webhook** (**breaking**): Input **`hook_id_base`** is **required** (trimmed non-empty). URL is always **`/hooks/<hook_id_base>-<env>`**. **`X-Secret`** is **`TMD_ADMIN_WEBHOOK_SECRET_<env>`** when **`hook_id_base`** equals **`vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`** (both trimmed, TMD var non-empty); otherwise **`REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Removed **`redeployment_webhook_secret`**. Callers must pass **`hook_id_base`** (e.g. **`${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}`** for BTMT, **`${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}`** for **The Music Deck admin** on infrastructure). **`secrets: inherit`** is enough for infrastructure’s second job. Unknown hook id still fails at the server (**404** / body check).
+- **call-redeployment-webhook** (**breaking**): Input **`hook_id_base`** is **required** (trimmed non-empty). URL is always **`/hooks/<hook_id_base>-<env>`**. **`X-Secret`** is **`TMD_ADMIN_API_WEBHOOK_SECRET_<env>`** when **`hook_id_base`** equals **`vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`** (both trimmed, TMD var non-empty); otherwise **`REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Removed **`redeployment_webhook_secret`**. Callers must pass **`hook_id_base`** (e.g. **`${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}`** for BTMT, **`${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}`** for **The Music Deck admin** on infrastructure). **`secrets: inherit`** is enough for infrastructure’s second job. Unknown hook id still fails at the server (**404** / body check).
 
 ## [0.1.7] - 2026-05-02
 
