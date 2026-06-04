@@ -192,7 +192,7 @@ This repo only contains workflow definitions. Each repository that **calls** the
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING` | Webhook secret for BTMT env `staging` (X-Secret header)                                           |
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD`    | Webhook secret for BTMT env `prod`                                                                |
 
-When **`hook_id_base`** equals **`TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`** (repository variable, trimmed), **`X-Secret`** uses **`TMD_ADMIN_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEBHOOK_SECRET_STAGING`** instead. **Infrastructure** sets that variable for **The Music Deck admin**; other repos can leave it unset. **`REDEPLOYMENT_WEBHOOK_PORT`** is always required.
+When **`hook_id_base`** equals **`TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`** (repository variable, trimmed), **`X-Secret`** uses **`TMD_ADMIN_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEBHOOK_SECRET_STAGING`**. When **`hook_id_base`** equals **`TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE`**, **`X-Secret`** uses **`TMD_ADMIN_WEB_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEB_WEBHOOK_SECRET_STAGING`**. Any other `hook_id_base` fails fast (no fallback). **`REDEPLOYMENT_WEBHOOK_PORT`** is always required.
 
 ### Sync env to server
 
