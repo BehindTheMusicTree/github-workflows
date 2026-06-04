@@ -54,11 +54,11 @@ Triggers a server redeployment webhook. Validates configuration, ensures `env` i
 
 **Workflow file:** `.github/workflows/call-redeployment-webhook.yml`
 
-| Input          | Required | Description                                                                                                                                                                                                                                                                                                                |
-| -------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `env`          | Yes      | `prod` or `staging` (lowercase)                                                                                                                                                                                                                                                                                            |
-| `images`       | No       | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`.                                                                                                                                                                                                                         |
-| `hook_id_base` | Yes      | Hook id for **`/hooks/<hook_id_base>-<env>`** (trimmed). **`X-Secret`**: if this equals **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** (trimmed, var non-empty), use **`TMD_ADMIN_WEBHOOK_SECRET_<env>`**; else **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Use distinct hook id bases for BTMT vs TMD on the same repo. |
+| Input          | Required | Description                                                                                                                                                                                                                                                                                                                    |
+| -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `env`          | Yes      | `prod` or `staging` (lowercase)                                                                                                                                                                                                                                                                                                |
+| `images`       | No       | Optional JSON object of image overrides (e.g. `{"gateway_image": "user/repo:tag"}`). Default `{}`.                                                                                                                                                                                                                             |
+| `hook_id_base` | Yes      | Hook id for **`/hooks/<hook_id_base>-<env>`** (trimmed). **`X-Secret`** is chosen by exact match (trimmed): **`vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE`** → **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_<env>`**; **`vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`** → **`TMD_ADMIN_WEBHOOK_SECRET_<env>`**; **`vars.TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE`** → **`TMD_ADMIN_WEB_WEBHOOK_SECRET_<env>`**; otherwise the workflow fails (no fallback). Use distinct hook id bases for each app on the same repo. |
 
 ### Set Image Tags On Server
 
@@ -66,13 +66,13 @@ Writes one pooled stack/env image-tags manifest on the server (atomic `*.new` th
 
 **Workflow file:** `.github/workflows/set-image-tags-on-server.yml`
 
-| Input                 | Required | Description                                                                                |
-| --------------------- | -------- | ------------------------------------------------------------------------------------------ |
-| `env`                 | Yes      | `prod` or `staging`                                                                        |
-| `stack`               | Yes      | Stack key in filename (e.g. `btmt`, `tmd-admin`)                                           |
-| `tags`                | Yes      | Multiline `KEY=VALUE` lines (e.g. `HTMT_API_TAG=staging`)                                  |
-| `release_id`          | No       | Optional release id metadata (`RELEASE_ID=`)                                               |
-| `release_sha`         | No       | Optional git SHA metadata (`RELEASE_SHA=`)                                                 |
+| Input         | Required | Description                                               |
+| ------------- | -------- | --------------------------------------------------------- |
+| `env`         | Yes      | `prod` or `staging`                                       |
+| `stack`       | Yes      | Stack key in filename (e.g. `btmt`, `tmd-admin`)          |
+| `tags`        | Yes      | Multiline `KEY=VALUE` lines (e.g. `HTMT_API_TAG=staging`) |
+| `release_id`  | No       | Optional release id metadata (`RELEASE_ID=`)              |
+| `release_sha` | No       | Optional git SHA metadata (`RELEASE_SHA=`)                |
 
 Required caller config: `vars.SERVER_HOST`, `vars.IMAGE_TAGS_POOL_DIR` (e.g. `/srv/btmt/image-tags`), `secrets.SERVER_DEPLOY_USERNAME`, `secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY`.
 
@@ -144,9 +144,9 @@ jobs:
 
 **BTMT main stack** (e.g. hear-the-music-tree-api): pass **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`** — same base string as in **`hooks.json`** on the server (from **BehindTheMusicTree/infrastructure** Server setup / Ansible).
 
-**the-music-deck-admin**: pass **`hook_id_base: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** (must match infra); **`call-redeployment-webhook`** chooses **`TMD_ADMIN_WEBHOOK_SECRET_*`** when **`hook_id_base`** equals **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**, otherwise **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_*`**.
+**the-music-deck-admin**: pass **`hook_id_base: ${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}`** for the admin **API** hook or **`hook_id_base: ${{ vars.TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE }}`** for the admin **web** hook (must match infra); **`call-redeployment-webhook`** selects **`X-Secret`** by exact 3-way match (BTMT / TMD admin API / TMD admin web) and fails on unknown bases (no fallback).
 
-**Infrastructure (two stacks):** **BehindTheMusicTree/infrastructure** `server-setup` runs two jobs with **`secrets: inherit`**: BTMT uses **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`**; **The Music Deck admin** uses **`hook_id_base: ${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** when that variable is set.
+**Infrastructure (two stacks):** **BehindTheMusicTree/infrastructure** `server-setup` runs two jobs with **`secrets: inherit`**: BTMT uses **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`**; **The Music Deck admin** uses **`hook_id_base: ${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}`** when that variable is set.
 
 With dependencies (e.g. after build):
 
@@ -192,20 +192,20 @@ This repo only contains workflow definitions. Each repository that **calls** the
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING` | Webhook secret for BTMT env `staging` (X-Secret header)                                           |
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD`    | Webhook secret for BTMT env `prod`                                                                |
 
-When **`hook_id_base`** equals **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** (repository variable, trimmed), **`X-Secret`** uses **`TMD_ADMIN_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEBHOOK_SECRET_STAGING`** instead. **Infrastructure** sets that variable for **The Music Deck admin**; other repos can leave it unset. **`REDEPLOYMENT_WEBHOOK_PORT`** is always required.
+When **`hook_id_base`** equals **`TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`** (repository variable, trimmed), **`X-Secret`** uses **`TMD_ADMIN_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEBHOOK_SECRET_STAGING`**. When **`hook_id_base`** equals **`TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE`**, **`X-Secret`** uses **`TMD_ADMIN_WEB_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEB_WEBHOOK_SECRET_STAGING`**. Any other `hook_id_base` fails fast (no fallback). **`REDEPLOYMENT_WEBHOOK_PORT`** is always required.
 
 ### Sync env to server
 
 Required by **sync-env-to-server** (caller’s environment):
 
-| Type     | Name                                   | Description                                                                                                             |
-| -------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Variable | `SERVER_HOST`                          | VPS IP or hostname for SSH                                                                                              |
-| Variable | `ENV_POOL_DIR`                         | Server pool directory where env fragments are stored (e.g. `/srv/btmt/env-pool`)                                      |
-| Variable | `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE` | Fragment filename prefix (e.g. `sync-env-`)                                                                             |
-| Variable | `HTMT_API_APP_NAME` or `APP_NAME`      | App name for fragment path (e.g. `htmt-api`)                                                                            |
-| Secret   | `SERVER_DEPLOY_USERNAME`               | SSH user                                                                                                                |
-| Secret   | `SERVER_DEPLOY_SSH_PRIVATE_KEY`        | SSH private key                                                                                                         |
+| Type     | Name                                   | Description                                                                      |
+| -------- | -------------------------------------- | -------------------------------------------------------------------------------- |
+| Variable | `SERVER_HOST`                          | VPS IP or hostname for SSH                                                       |
+| Variable | `ENV_POOL_DIR`                         | Server pool directory where env fragments are stored (e.g. `/srv/btmt/env-pool`) |
+| Variable | `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE` | Fragment filename prefix (e.g. `sync-env-`)                                      |
+| Variable | `HTMT_API_APP_NAME` or `APP_NAME`      | App name for fragment path (e.g. `htmt-api`)                                     |
+| Secret   | `SERVER_DEPLOY_USERNAME`               | SSH user                                                                         |
+| Secret   | `SERVER_DEPLOY_SSH_PRIVATE_KEY`        | SSH private key                                                                  |
 
 Plus any vars/secrets for the fragment keys (see workflow; add new keys in the reusable when needed).
 
