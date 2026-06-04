@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-06-04
+
+
 ### Fixed
 
 - **call-redeployment-webhook**: Fixed incorrect secret reference in The Music Deck admin staging branch (now correctly reads `TMD_ADMIN_API_WEBHOOK_SECRET_STAGING` and `TMD_ADMIN_API_WEBHOOK_SECRET_PROD`).
