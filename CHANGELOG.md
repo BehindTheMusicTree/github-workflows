@@ -52,6 +52,19 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **call-redeployment-webhook**: Added support for The Music Deck admin **web** app webhook
+  (`TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE` / `TMD_ADMIN_WEB_WEBHOOK_SECRET_{PROD,STAGING}`).
+  Secret routing is now an explicit three-way match; an unrecognised `hook_id_base` exits with an error
+  instead of silently falling back to BTMT secrets.
+
+### Fixed
+
+- **call-redeployment-webhook**: Renamed `TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE` →
+  `TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE` in workflow inputs, descriptions, and historical
+  changelog entries to distinguish the API hook from the new web hook.
+
 ## [2.0.0] - 2026-05-06
 
 ### Added
