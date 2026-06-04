@@ -54,7 +54,6 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [2.0.0] - 2026-05-06
 
-
 ### Added
 
 - **set-image-tags-on-server**: New reusable workflow `.github/workflows/set-image-tags-on-server.yml` writes one atomic pooled manifest per stack/env (`/srv/btmt/image-tags/<stack>-<env>.tags.env`) from multiline `KEY=VALUE` input, with optional `RELEASE_ID` / `RELEASE_SHA` metadata.
@@ -67,7 +66,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Documentation
 
-- **README** / **`workflow_call`** input description: BTMT main stack uses repository variable **`BTMT_REDEPLOYMENT_HOOK_ID_BASE`** (matches **BehindTheMusicTree/infrastructure**); **The Music Deck admin** stays **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**. Reverts **v1.0.3** docs that referenced **`BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**.
+- **README** / **`workflow_call`** input description: BTMT main stack uses repository variable **`BTMT_REDEPLOYMENT_HOOK_ID_BASE`** (matches **BehindTheMusicTree/infrastructure**); **The Music Deck admin** stays **`TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`**. Reverts **v1.0.3** docs that referenced **`BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**.
 
 ## [1.0.3] - 2026-05-02
 
@@ -77,11 +76,11 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Documentation
 
-- **README** / **`workflow_call`** input description: Document repository variable **`BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** for BTMT (aligned with **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** for The Music Deck admin). Behavior unchanged: **`hook_id_base`** must still match the id base registered in **`hooks.json`**.
+- **README** / **`workflow_call`** input description: Document repository variable **`BTMT_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** for BTMT (aligned with **`TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`** for The Music Deck admin). Behavior unchanged: **`hook_id_base`** must still match the id base registered in **`hooks.json`**.
 
 ## [1.0.2] - 2026-05-03
 
-- **typo**: rename **`TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE`** to **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**
+- **typo**: rename **`TMD_ADMIN_BTMT_REDEPLOYMENT_HOOK_ID_BASE`** to **`TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`**
 
 ## [1.0.1] - 2026-05-03
 
@@ -103,13 +102,13 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Changed
 
-- **call-redeployment-webhook** (**breaking**): Input **`hook_id_base`** is **required** (trimmed non-empty). URL is always **`/hooks/<hook_id_base>-<env>`**. **`X-Secret`** is **`TMD_ADMIN_WEBHOOK_SECRET_<env>`** when **`hook_id_base`** equals **`vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`** (both trimmed, TMD var non-empty); otherwise **`REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Removed **`redeployment_webhook_secret`**. Callers must pass **`hook_id_base`** (e.g. **`${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}`** for BTMT, **`${{ vars.TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE }}`** for **The Music Deck admin** on infrastructure). **`secrets: inherit`** is enough for infrastructure’s second job. Unknown hook id still fails at the server (**404** / body check).
+- **call-redeployment-webhook** (**breaking**): Input **`hook_id_base`** is **required** (trimmed non-empty). URL is always **`/hooks/<hook_id_base>-<env>`**. **`X-Secret`** is **`TMD_ADMIN_WEBHOOK_SECRET_<env>`** when **`hook_id_base`** equals **`vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`** (both trimmed, TMD var non-empty); otherwise **`REDEPLOYMENT_WEBHOOK_SECRET_<env>`**. Removed **`redeployment_webhook_secret`**. Callers must pass **`hook_id_base`** (e.g. **`${{ vars.REDEPLOYMENT_HOOK_ID_BASE }}`** for BTMT, **`${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}`** for **The Music Deck admin** on infrastructure). **`secrets: inherit`** is enough for infrastructure’s second job. Unknown hook id still fails at the server (**404** / body check).
 
 ## [0.1.7] - 2026-05-02
 
 ### Added
 
-- **call-redeployment-webhook** (`workflow_call` / `workflow_dispatch`): Optional input **`hook_id_base`** and optional secret **`redeployment_webhook_secret`**. When **`hook_id_base`** is non-empty after trim, the workflow validates **`SERVER_HOST`**, **`REDEPLOYMENT_WEBHOOK_PORT`**, **`hook_id_base`**, and **`redeployment_webhook_secret`**, then POSTs **`/hooks/<hook_id_base>-<env>`** with **`X-Secret`** from **`redeployment_webhook_secret`** (same **`Redeployment accepted`** body check). **BehindTheMusicTree/infrastructure** uses this for **The Music Deck admin** staging after **`provision`**, passing **`hook_id_base`** from **`TMD_ADMIN_REDEPLOYMENT_HOOK_ID_BASE`**. BTMT callers stay unchanged: omit **`hook_id_base`** (or pass empty) and use **`secrets: inherit`** with **`REDEPLOYMENT_HOOK_ID_BASE`** / **`REDEPLOYMENT_WEBHOOK_SECRET_*`**. Declared **`workflow_call`** secrets: **`REDEPLOYMENT_WEBHOOK_PORT`**, **`REDEPLOYMENT_WEBHOOK_SECRET_PROD`**, **`REDEPLOYMENT_WEBHOOK_SECRET_STAGING`**, **`redeployment_webhook_secret`** (all optional for **`inherit`**; TMD-only callers pass **`REDEPLOYMENT_WEBHOOK_PORT`** + **`redeployment_webhook_secret`** explicitly).
+- **call-redeployment-webhook** (`workflow_call` / `workflow_dispatch`): Optional input **`hook_id_base`** and optional secret **`redeployment_webhook_secret`**. When **`hook_id_base`** is non-empty after trim, the workflow validates **`SERVER_HOST`**, **`REDEPLOYMENT_WEBHOOK_PORT`**, **`hook_id_base`**, and **`redeployment_webhook_secret`**, then POSTs **`/hooks/<hook_id_base>-<env>`** with **`X-Secret`** from **`redeployment_webhook_secret`** (same **`Redeployment accepted`** body check). **BehindTheMusicTree/infrastructure** uses this for **The Music Deck admin** staging after **`provision`**, passing **`hook_id_base`** from **`TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`**. BTMT callers stay unchanged: omit **`hook_id_base`** (or pass empty) and use **`secrets: inherit`** with **`REDEPLOYMENT_HOOK_ID_BASE`** / **`REDEPLOYMENT_WEBHOOK_SECRET_*`**. Declared **`workflow_call`** secrets: **`REDEPLOYMENT_WEBHOOK_PORT`**, **`REDEPLOYMENT_WEBHOOK_SECRET_PROD`**, **`REDEPLOYMENT_WEBHOOK_SECRET_STAGING`**, **`redeployment_webhook_secret`** (all optional for **`inherit`**; TMD-only callers pass **`REDEPLOYMENT_WEBHOOK_PORT`** + **`redeployment_webhook_secret`** explicitly).
 
 ## [0.1.5] - 2026-04-28
 
