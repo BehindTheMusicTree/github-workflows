@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-06-04
+
+
 ### Added
 
 - **call-redeployment-webhook**: Added support for The Music Deck admin **web** app webhook
