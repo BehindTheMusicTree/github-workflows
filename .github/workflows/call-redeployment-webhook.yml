@@ -184,6 +184,10 @@ jobs:
           tmd_ref=$(trim "${TMD_HOOK_VAR:-}")
           tmd_web_ref=$(trim "${TMD_WEB_HOOK_VAR:-}")
           hook_trim=$(trim "${HOOK_BASE:-}")
+          if [[ -n "$btmt_ref" && -n "$tmd_ref" && "$btmt_ref" == "$tmd_ref" ]] || [[ -n "$btmt_ref" && -n "$tmd_web_ref" && "$btmt_ref" == "$tmd_web_ref" ]] || [[ -n "$tmd_ref" && -n "$tmd_web_ref" && "$tmd_ref" == "$tmd_web_ref" ]]; then
+            echo "ERROR: Redeployment hook id bases must be distinct (BTMT_REDEPLOYMENT_HOOK_ID_BASE, TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE, TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE)."
+            exit 1
+          fi
           if [[ -n "$btmt_ref" && "$hook_trim" == "$btmt_ref" ]]; then
             case "$ENV" in
               prod) secret="${BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD}" ;;
