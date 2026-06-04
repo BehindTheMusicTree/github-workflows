@@ -144,7 +144,7 @@ jobs:
 
 **BTMT main stack** (e.g. hear-the-music-tree-api): pass **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`** — same base string as in **`hooks.json`** on the server (from **BehindTheMusicTree/infrastructure** Server setup / Ansible).
 
-**the-music-deck-admin**: pass **`hook_id_base: ${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}`** (must match infra); **`call-redeployment-webhook`** chooses **`TMD_ADMIN_WEBHOOK_SECRET_*`** when **`hook_id_base`** equals **`vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`**, otherwise **`BTMT_REDEPLOYMENT_WEBHOOK_SECRET_*`**.
+**the-music-deck-admin**: pass **`hook_id_base: ${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}`** for the admin **API** hook or **`hook_id_base: ${{ vars.TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE }}`** for the admin **web** hook (must match infra); **`call-redeployment-webhook`** selects **`X-Secret`** by exact 3-way match (BTMT / TMD admin API / TMD admin web) and fails on unknown bases (no fallback).
 
 **Infrastructure (two stacks):** **BehindTheMusicTree/infrastructure** `server-setup` runs two jobs with **`secrets: inherit`**: BTMT uses **`hook_id_base: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}`**; **The Music Deck admin** uses **`hook_id_base: ${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}`** when that variable is set.
 
