@@ -1,0 +1,86 @@
+# App-agnostic composite action: push an env fragment to a Coolify application via API.
+# Idempotent: GET existing envs → POST new keys, PATCH changed values.
+# Runs in the caller's job so the fragment file (containing plaintext secrets)
+# never leaves the runner or gets persisted as an artifact.
+name: Sync env to Coolify
+description: Push a local env fragment file to a Coolify application via API
+
+inputs:
+  app_name:
+    description: "Coolify application name (e.g. htmt-api)"
+    required: true
+  coolify_environment:
+    description: "Coolify environment name (production or staging)"
+    required: true
+  fragment_path:
+    description: "Local path to the env fragment file (e.g. fragment.env)"
+    required: true
+  coolify_api_url:
+    description: "Coolify API base URL (e.g. https://coolify.example.com)"
+    required: true
+  coolify_api_token:
+    description: "Coolify API token (composite actions have no secrets: block — pass via with:)"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Sync env vars to Coolify
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app_name }}
+        COOLIFY_ENVIRONMENT: ${{ inputs.coolify_environment }}
+        COOLIFY_API_URL: ${{ inputs.coolify_api_url }}
+        COOLIFY_API_TOKEN: ${{ inputs.coolify_api_token }}
+        FRAGMENT_FILE: ${{ inputs.fragment_path }}
+      run: |
+        set -euo pipefail
+
+        if [ ! -f "$FRAGMENT_FILE" ]; then
+          echo "ERROR: Fragment file not found: $FRAGMENT_FILE"
+          exit 1
+        fi
+
+        echo "Looking up Coolify app '${APP_NAME}' in environment '${COOLIFY_ENVIRONMENT}'..."
+        apps=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+          "${COOLIFY_API_URL}/api/v1/applications")
+        app_uuid=$(echo "$apps" | jq -r \
+          --arg name "$APP_NAME" \
+          --arg env "$COOLIFY_ENVIRONMENT" \
+          '.[] | select(.name == $name and .environment.name == $env) | .uuid' | head -1)
+        if [ -z "$app_uuid" ]; then
+          echo "ERROR: No Coolify app found with name '${APP_NAME}' in environment '${COOLIFY_ENVIRONMENT}'"
+          exit 1
+        fi
+        echo "Found app UUID: ${app_uuid}"
+
+        existing=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+          "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs")
+
+        while IFS= read -r line || [ -n "$line" ]; do
+          [[ -z "$line" || "$line" == \#* ]] && continue
+          key="${line%%=*}"
+          value="${line#*=}"
+          existing_uuid=$(echo "$existing" | jq -r \
+            --arg key "$key" \
+            '.[] | select(.key == $key) | .uuid' | head -1)
+          json_key=$(printf '%s' "$key" | jq -Rs .)
+          json_value=$(printf '%s' "$value" | jq -Rs .)
+          if [ -z "$existing_uuid" ]; then
+            printf '  POST %s\n' "$key"
+            curl -sf -X POST \
+              -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false}" \
+              "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs" > /dev/null
+          else
+            json_uuid=$(printf '%s' "$existing_uuid" | jq -Rs .)
+            printf '  PATCH %s\n' "$key"
+            curl -sf -X PATCH \
+              -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"uuid\":${json_uuid},\"key\":${json_key},\"value\":${json_value},\"is_preview\":false}" \
+              "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs" > /dev/null
+          fi
+        done < "$FRAGMENT_FILE"
+        echo "Done — env vars synced for '${APP_NAME}' (${COOLIFY_ENVIRONMENT})"
