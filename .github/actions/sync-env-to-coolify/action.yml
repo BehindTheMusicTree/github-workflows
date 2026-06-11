@@ -15,8 +15,11 @@ inputs:
   fragment_path:
     description: "Local path to the env fragment file (e.g. fragment.env)"
     required: true
-  coolify_api_url:
-    description: "Coolify API base URL (e.g. https://coolify.example.com)"
+  coolify_subdomain:
+    description: "Coolify subdomain (e.g. coolify)"
+    required: true
+  domain:
+    description: "Base domain (e.g. example.com)"
     required: true
   coolify_api_token:
     description: "Coolify API token (composite actions have no secrets: block — pass via with:)"
@@ -30,11 +33,14 @@ runs:
       env:
         APP_NAME: ${{ inputs.app_name }}
         COOLIFY_ENVIRONMENT: ${{ inputs.coolify_environment }}
-        COOLIFY_API_URL: ${{ inputs.coolify_api_url }}
+        COOLIFY_SUBDOMAIN: ${{ inputs.coolify_subdomain }}
+        DOMAIN: ${{ inputs.domain }}
         COOLIFY_API_TOKEN: ${{ inputs.coolify_api_token }}
         FRAGMENT_FILE: ${{ inputs.fragment_path }}
       run: |
         set -euo pipefail
+
+        COOLIFY_API_URL="https://${COOLIFY_SUBDOMAIN}.${DOMAIN}"
 
         if [ ! -f "$FRAGMENT_FILE" ]; then
           echo "ERROR: Fragment file not found: $FRAGMENT_FILE"
