@@ -52,6 +52,14 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **sync-env-to-coolify**: New composite action `.github/actions/sync-env-to-coolify` pushes a local env fragment file to a Coolify application via the Coolify API. Idempotent: looks up the app by name/environment, then POSTs new keys and PATCHes changed values. Runs in the caller's job so plaintext secrets never leave the runner or get persisted as an artifact. Coolify API URL is derived from `coolify_subdomain` + `domain` inputs. New `is_buildtime` / `is_runtime` inputs (default `false` / `true`) are set on synced env vars.
+
+### Removed
+
+- **sync-env-to-server** (**breaking**): Removed the legacy SSH-based `sync-env-to-server.yml` reusable workflow, fully replaced by the `sync-env-to-coolify` composite action. Callers still using `uses: .../sync-env-to-server.yml@...` must migrate to `sync-env-to-coolify`.
+
 ## [3.0.1] - 2026-06-04
 
 

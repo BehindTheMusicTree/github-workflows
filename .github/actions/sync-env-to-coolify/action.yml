@@ -24,6 +24,14 @@ inputs:
   coolify_api_token:
     description: "Coolify API token (composite actions have no secrets: block — pass via with:)"
     required: true
+  is_buildtime:
+    description: "Set is_buildtime on synced env vars"
+    required: false
+    default: "false"
+  is_runtime:
+    description: "Set is_runtime on synced env vars"
+    required: false
+    default: "true"
 
 runs:
   using: composite
@@ -37,6 +45,8 @@ runs:
         DOMAIN: ${{ inputs.domain }}
         COOLIFY_API_TOKEN: ${{ inputs.coolify_api_token }}
         FRAGMENT_FILE: ${{ inputs.fragment_path }}
+        IS_BUILDTIME: ${{ inputs.is_buildtime }}
+        IS_RUNTIME: ${{ inputs.is_runtime }}
       run: |
         set -euo pipefail
 
@@ -77,7 +87,7 @@ runs:
             curl -sf -X POST \
               -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               -H "Content-Type: application/json" \
-              -d "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false}" \
+              -d "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs" > /dev/null
           else
             json_uuid=$(printf '%s' "$existing_uuid" | jq -Rs .)
@@ -85,7 +95,7 @@ runs:
             curl -sf -X PATCH \
               -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               -H "Content-Type: application/json" \
-              -d "{\"uuid\":${json_uuid},\"key\":${json_key},\"value\":${json_value},\"is_preview\":false}" \
+              -d "{\"uuid\":${json_uuid},\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs" > /dev/null
           fi
         done < "$FRAGMENT_FILE"
