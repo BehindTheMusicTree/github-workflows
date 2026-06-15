@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-06-15
+
+
 ### Fixed
 
 - **sync-env-to-coolify**: Fixed app lookup, which always failed with "No Coolify app found" because the Coolify `/api/v1/applications` API has no nested `environment.name` field (only `environment_id`). The action now resolves the target environment's id(s) via `/api/v1/projects` and matches applications by `environment_id`.
