@@ -105,12 +105,11 @@ runs:
               -d "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs" > /dev/null
           else
-            json_uuid=$(printf '%s' "$existing_uuid" | jq -Rs .)
             printf '  PATCH %s\n' "$key"
             curl -sf -X PATCH \
               -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               -H "Content-Type: application/json" \
-              -d "{\"uuid\":${json_uuid},\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
+              -d "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs" > /dev/null
           fi
         done < "$FRAGMENT_FILE"
