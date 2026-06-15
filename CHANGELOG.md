@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.0.2] - 2026-06-15
+
+
 ### Fixed
 
 - **sync-env-to-coolify**: Fixed PATCH requests for existing env vars failing with a 422 ("Validation failed", curl exit 22) because the request body included an `uuid` field, which Coolify's `update_env_by_uuid` endpoint rejects as not allowed. The `uuid` is only needed in the URL, not the body.
