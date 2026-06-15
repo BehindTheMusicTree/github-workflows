@@ -58,12 +58,27 @@ runs:
         fi
 
         echo "Looking up Coolify app '${APP_NAME}' in environment '${COOLIFY_ENVIRONMENT}'..."
+
+        # /api/v1/applications only exposes environment_id (no nested environment name),
+        # so resolve the target environment's id(s) across all projects first.
+        projects=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+          "${COOLIFY_API_URL}/api/v1/projects")
+
+        env_ids="[]"
+        for project_uuid in $(echo "$projects" | jq -r '.[].uuid'); do
+          project=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_API_URL}/api/v1/projects/${project_uuid}")
+          ids=$(echo "$project" | jq -c --arg env "$COOLIFY_ENVIRONMENT" \
+            '[.environments[] | select(.name == $env) | .id]')
+          env_ids=$(jq -c -n --argjson a "$env_ids" --argjson b "$ids" '$a + $b')
+        done
+
         apps=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
           "${COOLIFY_API_URL}/api/v1/applications")
         app_uuid=$(echo "$apps" | jq -r \
           --arg name "$APP_NAME" \
-          --arg env "$COOLIFY_ENVIRONMENT" \
-          '.[] | select(.name == $name and .environment.name == $env) | .uuid' | head -1)
+          --argjson env_ids "$env_ids" \
+          '.[] | select(.name == $name and (.environment_id | IN($env_ids[]))) | .uuid' | head -1)
         if [ -z "$app_uuid" ]; then
           echo "ERROR: No Coolify app found with name '${APP_NAME}' in environment '${COOLIFY_ENVIRONMENT}'"
           exit 1
