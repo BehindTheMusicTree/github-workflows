@@ -110,7 +110,7 @@ runs:
               -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               -H "Content-Type: application/json" \
               -d "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
-              "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs" > /dev/null
+              "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs/${existing_uuid}" > /dev/null
           fi
         done < "$FRAGMENT_FILE"
         echo "Done — env vars synced for '${APP_NAME}' (${COOLIFY_ENVIRONMENT})"
