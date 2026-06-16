@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.0.8] - 2026-06-17
+
+
 ### Fixed
 
 - **sync-env-to-coolify**: Replaced PATCH with DELETE + POST for existing env vars. `PATCH /api/v1/applications/{uuid}/envs` cannot locate variables by `key` ("Environment variable not found"), and Coolify rejects any UUID identifier in the body ("This field is not allowed"). Deleting by env var UUID then re-POSTing is idempotent and avoids the broken PATCH endpoint entirely.
