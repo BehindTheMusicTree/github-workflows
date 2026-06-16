@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.0.7] - 2026-06-17
+
+
 ### Fixed
 
 - **sync-env-to-coolify**: PATCH body now sends only `key` and `value`. The `PATCH /api/v1/applications/{uuid}/envs` endpoint identifies the var by `key` and rejects all other fields (`uuid`, `is_preview`, `is_buildtime`, `is_runtime`) with 422 — those fields are only valid on POST.
