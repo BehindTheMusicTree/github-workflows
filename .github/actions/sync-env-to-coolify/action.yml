@@ -118,8 +118,8 @@ runs:
           else
             printf '  PATCH %s\n' "$key"
             curl_request PATCH \
-              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
-              "${COOLIFY_API_URL}/api/v1/envs/${existing_uuid}"
+              "{\"key\":${json_key},\"value\":${json_value}}" \
+              "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
           fi
         done < "$FRAGMENT_FILE"
         echo "Done — env vars synced for '${APP_NAME}' (${COOLIFY_ENVIRONMENT})"
