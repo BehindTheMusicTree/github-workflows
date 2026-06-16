@@ -100,10 +100,11 @@ runs:
           curl_request() {
             local method="$1" body="$2" url="$3"
             local http_code response
-            response=$(curl -s -w "\n%{http_code}" -X "$method" \
-              -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
-              -H "Content-Type: application/json" \
-              -d "$body" "$url")
+            local curl_args=(-s -w "\n%{http_code}" -X "$method"
+              -H "Authorization: Bearer ${COOLIFY_API_TOKEN}"
+              -H "Content-Type: application/json")
+            [ -n "$body" ] && curl_args+=(-d "$body")
+            response=$(curl "${curl_args[@]}" "$url")
             http_code=$(printf '%s' "$response" | tail -1)
             if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
               printf '    ERROR: HTTP %s — %s\n' "$http_code" "$(printf '%s' "$response" | head -n -1)"
@@ -116,9 +117,10 @@ runs:
               "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
           else
-            printf '  PATCH %s\n' "$key"
-            curl_request PATCH \
-              "{\"key\":${json_key},\"value\":${json_value}}" \
+            printf '  UPDATE %s\n' "$key"
+            curl_request DELETE "" "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs/${existing_uuid}"
+            curl_request POST \
+              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
           fi
         done < "$FRAGMENT_FILE"
