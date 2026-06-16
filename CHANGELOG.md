@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.0.9] - 2026-06-17
+
+
 ### Fixed
 
 - **sync-env-to-coolify**: Added cleanup of stale env vars — after syncing the fragment, any var present in Coolify but absent from the fragment is deleted. Added per-var type annotation: append `# type=buildtime|runtime|both` to a fragment line to override the action-level `is_buildtime`/`is_runtime` defaults for that variable. Moved `curl_request` helper outside the loop.
