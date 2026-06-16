@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.0.3] - 2026-06-17
+
+
 ### Fixed
 
 - **sync-env-to-coolify**: Fixed PATCH requests for existing env vars failing with exit code 22 because the request was sent to the collection endpoint `/envs` instead of the resource endpoint `/envs/{uuid}`. The env var UUID is now appended to the URL path, matching Coolify's `update_env_by_uuid` endpoint contract. (The previous v4.0.2 fix removed `uuid` from the body but forgot to add it to the URL.)
