@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Fixed
+
+- **sync-env-to-coolify**: PATCH for existing env vars now targets the top-level resource endpoint `PATCH /api/v1/envs/{env_uuid}` instead of the application collection endpoint. `PATCH /api/v1/applications/{uuid}/envs` rejects the `uuid` body field (422 "This field is not allowed") and has no path-param variant — the correct route is the standalone `/api/v1/envs/{uuid}` endpoint where `{uuid}` is the env var's own UUID.
+
 ## [4.0.5] - 2026-06-17
 
 
