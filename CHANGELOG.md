@@ -52,6 +52,16 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Fixed
+
+- **sync-env-to-coolify**: PATCH requests for existing env vars now include the env var `uuid` in the request body, which Coolify requires to identify which variable to update. The v4.0.2 removal of `uuid` from the body left PATCH with no way to target the correct var; the v4.0.3 URL-path approach (`/envs/{uuid}`) returned 404 (route does not exist); v4.0.4 reverted the URL but left the body incomplete. Also replaced the silent `-f` curl flag with explicit HTTP status checking so API errors are printed instead of swallowed.
+
+## [4.0.4] - 2026-06-17
+
+### Fixed
+
+- **sync-env-to-coolify**: Reverted the PATCH URL introduced in v4.0.3 — Coolify has no `/api/v1/applications/{uuid}/envs/{env_uuid}` route; appending the env var UUID returned 404 on every PATCH call.
+
 ## [4.0.3] - 2026-06-17
 
 
