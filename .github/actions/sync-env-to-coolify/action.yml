@@ -1,5 +1,7 @@
 # App-agnostic composite action: push an env fragment to a Coolify application via API.
-# Idempotent: GET existing envs → POST new keys, PATCH changed values.
+# Idempotent: GET existing envs → DELETE+POST changed/new keys, DELETE stale keys.
+# Supports per-var type annotation: append " # type=buildtime|runtime|both" to a line
+# to override the action-level is_buildtime/is_runtime defaults for that variable.
 # Runs in the caller's job so the fragment file (containing plaintext secrets)
 # never leaves the runner or gets persisted as an artifact.
 name: Sync env to Coolify
@@ -25,11 +27,11 @@ inputs:
     description: "Coolify API token (composite actions have no secrets: block — pass via with:)"
     required: true
   is_buildtime:
-    description: "Set is_buildtime on synced env vars"
+    description: "Default is_buildtime for synced env vars (overridable per line with # type=buildtime|runtime|both)"
     required: false
     default: "false"
   is_runtime:
-    description: "Set is_runtime on synced env vars"
+    description: "Default is_runtime for synced env vars (overridable per line with # type=buildtime|runtime|both)"
     required: false
     default: "true"
 
@@ -88,40 +90,72 @@ runs:
         existing=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
           "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs")
 
+        curl_request() {
+          local method="$1" body="$2" url="$3"
+          local http_code response
+          local curl_args=(-s -w "\n%{http_code}" -X "$method"
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}"
+            -H "Content-Type: application/json")
+          [ -n "$body" ] && curl_args+=(-d "$body")
+          response=$(curl "${curl_args[@]}" "$url")
+          http_code=$(printf '%s' "$response" | tail -1)
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            printf '    ERROR: HTTP %s — %s\n' "$http_code" "$(printf '%s' "$response" | head -n -1)"
+            return 1
+          fi
+        }
+
+        managed_keys=()
+
         while IFS= read -r line || [ -n "$line" ]; do
+          # Parse optional inline type annotation: KEY=value # type=buildtime|runtime|both
+          annotation=""
+          if [[ "$line" == *" # type="* ]]; then
+            annotation="${line##* # type=}"
+            line="${line%% # type=*}"
+          fi
           [[ -z "$line" || "$line" == \#* ]] && continue
           key="${line%%=*}"
           value="${line#*=}"
+          managed_keys+=("$key")
+
+          var_buildtime="$IS_BUILDTIME"
+          var_runtime="$IS_RUNTIME"
+          case "$annotation" in
+            buildtime) var_buildtime=true;  var_runtime=false ;;
+            runtime)   var_buildtime=false; var_runtime=true  ;;
+            both)      var_buildtime=true;  var_runtime=true  ;;
+          esac
+
           existing_uuid=$(echo "$existing" | jq -r \
             --arg key "$key" \
             '.[] | select(.key == $key) | .uuid' | head -1)
           json_key=$(printf '%s' "$key" | jq -Rs .)
           json_value=$(printf '%s' "$value" | jq -Rs .)
-          curl_request() {
-            local method="$1" body="$2" url="$3"
-            local http_code response
-            local curl_args=(-s -w "\n%{http_code}" -X "$method"
-              -H "Authorization: Bearer ${COOLIFY_API_TOKEN}"
-              -H "Content-Type: application/json")
-            [ -n "$body" ] && curl_args+=(-d "$body")
-            response=$(curl "${curl_args[@]}" "$url")
-            http_code=$(printf '%s' "$response" | tail -1)
-            if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
-              printf '    ERROR: HTTP %s — %s\n' "$http_code" "$(printf '%s' "$response" | head -n -1)"
-              return 1
-            fi
-          }
+
           if [ -z "$existing_uuid" ]; then
             printf '  POST %s\n' "$key"
             curl_request POST \
-              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
+              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${var_buildtime},\"is_runtime\":${var_runtime}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
           else
             printf '  UPDATE %s\n' "$key"
             curl_request DELETE "" "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs/${existing_uuid}"
             curl_request POST \
-              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${IS_BUILDTIME},\"is_runtime\":${IS_RUNTIME}}" \
+              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${var_buildtime},\"is_runtime\":${var_runtime}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
           fi
         done < "$FRAGMENT_FILE"
+
+        # Delete vars that exist in Coolify but are absent from the fragment
+        if [ "${#managed_keys[@]}" -gt 0 ]; then
+          managed_keys_json=$(printf '%s\n' "${managed_keys[@]}" | jq -R . | jq -s .)
+          while IFS=$'\t' read -r stale_key stale_uuid; do
+            if ! echo "$managed_keys_json" | jq -e --arg k "$stale_key" 'index($k) != null' > /dev/null 2>&1; then
+              printf '  DELETE (stale) %s\n' "$stale_key"
+              curl_request DELETE "" "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs/${stale_uuid}"
+            fi
+          done < <(echo "$existing" | jq -r '.[] | [.key, .uuid] | @tsv')
+        fi
+
         echo "Done — env vars synced for '${APP_NAME}' (${COOLIFY_ENVIRONMENT})"
