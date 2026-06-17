@@ -1,5 +1,6 @@
 # App-agnostic composite action: push an env fragment to a Coolify application via API.
-# Idempotent: GET existing envs → DELETE+POST changed/new keys, DELETE stale keys.
+# Idempotent: GET existing envs → DELETE+POST changed/new keys. Keys not in the fragment
+# are left untouched in Coolify.
 # Supports per-var type annotation: append " # type=buildtime|runtime|both" to a line
 # to override the action-level is_buildtime/is_runtime defaults for that variable.
 # Runs in the caller's job so the fragment file (containing plaintext secrets)
@@ -105,8 +106,6 @@ runs:
           fi
         }
 
-        managed_keys=()
-
         while IFS= read -r line || [ -n "$line" ]; do
           # Parse optional inline type annotation: KEY=value # type=buildtime|runtime|both
           annotation=""
@@ -117,8 +116,6 @@ runs:
           [[ -z "$line" || "$line" == \#* ]] && continue
           key="${line%%=*}"
           value="${line#*=}"
-          managed_keys+=("$key")
-
           var_buildtime="$IS_BUILDTIME"
           var_runtime="$IS_RUNTIME"
           case "$annotation" in
@@ -146,16 +143,5 @@ runs:
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
           fi
         done < "$FRAGMENT_FILE"
-
-        # Delete vars that exist in Coolify but are absent from the fragment
-        if [ "${#managed_keys[@]}" -gt 0 ]; then
-          managed_keys_json=$(printf '%s\n' "${managed_keys[@]}" | jq -R . | jq -s .)
-          while IFS=$'\t' read -r stale_key stale_uuid; do
-            if ! echo "$managed_keys_json" | jq -e --arg k "$stale_key" 'index($k) != null' > /dev/null 2>&1; then
-              printf '  DELETE (stale) %s\n' "$stale_key"
-              curl_request DELETE "" "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs/${stale_uuid}"
-            fi
-          done < <(echo "$existing" | jq -r '.[] | [.key, .uuid] | @tsv')
-        fi
 
         echo "Done — env vars synced for '${APP_NAME}' (${COOLIFY_ENVIRONMENT})"
