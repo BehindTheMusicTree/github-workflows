@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.0.10] - 2026-06-17
+
+
 ### Fixed
 
 - **sync-env-to-coolify**: Reverted stale-var cleanup introduced in v4.0.9. Deleting vars not in the fragment broke apps whose Coolify env is managed by multiple fragment workflows (e.g. build secrets + runtime vars). Keys absent from the fragment are now left untouched.
