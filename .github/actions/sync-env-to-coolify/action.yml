@@ -124,20 +124,22 @@ runs:
             both)      var_buildtime=true;  var_runtime=true  ;;
           esac
 
-          existing_uuid=$(echo "$existing" | jq -r \
+          mapfile -t existing_uuids < <(echo "$existing" | jq -r \
             --arg key "$key" \
-            '.[] | select(.key == $key) | .uuid' | head -1)
+            '.[] | select(.key == $key) | .uuid')
           json_key=$(printf '%s' "$key" | jq -Rs .)
           json_value=$(printf '%s' "$value" | jq -Rs .)
 
-          if [ -z "$existing_uuid" ]; then
+          if [ "${#existing_uuids[@]}" -eq 0 ]; then
             printf '  POST %s\n' "$key"
             curl_request POST \
               "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${var_buildtime},\"is_runtime\":${var_runtime}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
           else
-            printf '  UPDATE %s\n' "$key"
-            curl_request DELETE "" "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs/${existing_uuid}"
+            printf '  UPDATE %s (%d existing)\n' "$key" "${#existing_uuids[@]}"
+            for _uuid in "${existing_uuids[@]}"; do
+              curl_request DELETE "" "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs/${_uuid}"
+            done
             curl_request POST \
               "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${var_buildtime},\"is_runtime\":${var_runtime}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
