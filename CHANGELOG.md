@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.0.11] - 2026-06-18
+
+
 ### Fixed
 
 - **sync-env-to-coolify**: Delete all matching UUIDs for a key instead of only the first (`head -1`). Coolify can hold both an `is_preview=true` and an `is_preview=false` record for the same key; previously the leftover preview record survived every sync run and could carry stale template values (e.g. `${{service.VAR}}`) that broke deployments.
