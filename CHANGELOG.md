@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **sync-env-to-coolify**: new `is_preview` input (default `false`) to sync a fragment into Coolify's PR-preview-deployment env var collection instead of the regular one. Coolify allows one row per key per `is_preview` value (`unique(key, application_id, is_build_time, is_preview)`), so callers can now sync both a regular and a preview copy of the same key without them clobbering each other — previously the action's dedup lookup matched by `key` alone and always wrote `is_preview:false`, so any caller adding a preview-scoped sync would have deleted the existing regular entry (and vice versa). Found while adding PR preview deployments for `the-music-deck-admin`'s `tmd-admin-web`/`tmd-admin-showcase`: preview builds need their own copy of build-time secrets like `GH_PACKAGES_TOKEN_READ`, which this action had no way to push.
+
 ## [4.0.11] - 2026-06-18
 
 

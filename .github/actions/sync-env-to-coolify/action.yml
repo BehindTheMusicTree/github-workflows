@@ -35,6 +35,15 @@ inputs:
     description: "Default is_runtime for synced env vars (overridable per line with # type=buildtime|runtime|both)"
     required: false
     default: "true"
+  is_preview:
+    description: >-
+      Whether these vars target Coolify's PR-preview-deployment env var collection
+      (is_preview=true) instead of the app's regular one. Coolify allows one row per
+      key per is_preview value (unique on key+application_id+is_build_time+is_preview),
+      so a preview-scoped sync and a regular sync of the same key coexist rather than
+      overwrite each other.
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -50,6 +59,7 @@ runs:
         FRAGMENT_FILE: ${{ inputs.fragment_path }}
         IS_BUILDTIME: ${{ inputs.is_buildtime }}
         IS_RUNTIME: ${{ inputs.is_runtime }}
+        IS_PREVIEW: ${{ inputs.is_preview }}
       run: |
         set -euo pipefail
 
@@ -126,22 +136,23 @@ runs:
 
           mapfile -t existing_uuids < <(echo "$existing" | jq -r \
             --arg key "$key" \
-            '.[] | select(.key == $key) | .uuid')
+            --argjson is_preview "$IS_PREVIEW" \
+            '.[] | select(.key == $key and .is_preview == $is_preview) | .uuid')
           json_key=$(printf '%s' "$key" | jq -Rs .)
           json_value=$(printf '%s' "$value" | jq -Rs .)
 
           if [ "${#existing_uuids[@]}" -eq 0 ]; then
-            printf '  POST %s\n' "$key"
+            printf '  POST %s (is_preview=%s)\n' "$key" "$IS_PREVIEW"
             curl_request POST \
-              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${var_buildtime},\"is_runtime\":${var_runtime}}" \
+              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":${IS_PREVIEW},\"is_buildtime\":${var_buildtime},\"is_runtime\":${var_runtime}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
           else
-            printf '  UPDATE %s (%d existing)\n' "$key" "${#existing_uuids[@]}"
+            printf '  UPDATE %s (is_preview=%s, %d existing)\n' "$key" "$IS_PREVIEW" "${#existing_uuids[@]}"
             for _uuid in "${existing_uuids[@]}"; do
               curl_request DELETE "" "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs/${_uuid}"
             done
             curl_request POST \
-              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":false,\"is_buildtime\":${var_buildtime},\"is_runtime\":${var_runtime}}" \
+              "{\"key\":${json_key},\"value\":${json_value},\"is_preview\":${IS_PREVIEW},\"is_buildtime\":${var_buildtime},\"is_runtime\":${var_runtime}}" \
               "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}/envs"
           fi
         done < "$FRAGMENT_FILE"
