@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **trigger-coolify-deploy**: new composite action to trigger a Coolify application deploy via API, poll it to a terminal status, and optionally HTTP health-check it before returning. Lets callers enforce cross-application deploy ordering (e.g. deploy `tmd-admin-api` before `tmd-admin-web`) from GitHub Actions instead of relying on Coolify's native, unordered git-push auto-deploy — needed because the VPS has a single concurrent build slot, so two independently-triggered, order-dependent builds can otherwise deadlock or race. Supports PR-preview deploys (`pr_number`) with retry-on-not-found to tolerate the race against Coolify's own webhook-driven preview creation.
+
 ## [4.1.0] - 2026-07-29
 
 

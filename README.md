@@ -13,6 +13,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
   - [Call Redeployment Webhook](#call-redeployment-webhook)
   - [Set Image Tags On Server](#set-image-tags-on-server)
   - [Sync env to server](#sync-env-to-server)
+  - [Trigger Coolify Deploy](#trigger-coolify-deploy)
   - [Deploy App Env File](#deploy-app-env-file)
   - [Deploy Nginx Env Fragment](#deploy-nginx-env-fragment)
   - [Deploy Partial Docker Compose](#deploy-partial-docker-compose)
@@ -89,6 +90,39 @@ App-agnostic reusable: upload an env fragment into **`ENV_POOL_DIR`** on the ser
 | `fragment_artifact` | Yes      | Artifact name and path to fragment file (e.g. `sync-env-fragment-staging/fragment.env`) |
 
 **Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact`. Required **vars** (repo or environment): `SERVER_HOST`, `ENV_POOL_DIR`, `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). Trigger **redeploy** after sync so promoted **`sync-env`** files reach **`compose/*.env`** / compose generation. To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
+
+### Trigger Coolify Deploy
+
+App-agnostic composite action: trigger a Coolify application deploy via API, poll it to a terminal status (`finished`/`failed`/`cancelled-by-user`), and optionally HTTP health-check it before returning. Use this to enforce cross-application deploy ordering (e.g. deploy an API before its dependent web app) instead of relying on Coolify's native, unordered git-push auto-deploy — most useful on single-build-slot Coolify instances where two order-dependent builds triggered independently can otherwise deadlock or race.
+
+**Action path:** `.github/actions/trigger-coolify-deploy`
+
+| Input                             | Required | Description                                                                                                          |
+| ---------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `app_name`                         | Yes      | Coolify application name (e.g. `tmd-admin-api`)                                                                      |
+| `coolify_environment`              | Yes      | Coolify environment name (`production` or `staging`)                                                                |
+| `coolify_subdomain`                | Yes      | Coolify subdomain (e.g. `coolify`)                                                                                   |
+| `domain`                           | Yes      | Base domain (e.g. `example.com`)                                                                                     |
+| `coolify_api_token`                | Yes      | Coolify API token (composite actions have no `secrets:` block — pass via `with:`)                                     |
+| `pr_number`                        | No       | PR number to target a PR-preview deployment instead of the regular one                                              |
+| `force`                            | No       | Force a fresh deploy even if the commit is already deployed. Default `false`                                        |
+| `poll_timeout_seconds`             | No       | Max seconds to wait for the deployment (and health check, if any) to finish. Default `900`                          |
+| `poll_interval_seconds`            | No       | Seconds between deployment/health-check polls. Default `15`                                                         |
+| `preview_not_found_timeout_seconds`| No       | Max seconds to retry a PR-preview deploy trigger while Coolify hasn't created the preview yet. Default `180`         |
+| `health_check_path`                | No       | Path (e.g. `/health`) to poll for HTTP 200 after the deployment finishes                                            |
+| `health_check_base_url_override`   | No       | Base URL to health-check instead of the app's own fqdn. Required when both `pr_number` and `health_check_path` are set (Coolify's API doesn't expose a preview's fqdn) |
+
+```yaml
+- name: Trigger tmd-admin-api deploy
+  uses: BehindTheMusicTree/github-workflows/.github/actions/trigger-coolify-deploy@v4.2.0
+  with:
+    app_name: tmd-admin-api
+    coolify_environment: staging
+    coolify_subdomain: ${{ vars.COOLIFY_API_SUBDOMAIN }}
+    domain: ${{ vars.DOMAIN_NAME }}
+    coolify_api_token: ${{ secrets.COOLIFY_API_TOKEN }}
+    health_check_path: /health
+```
 
 ### Deploy App Env File
 
