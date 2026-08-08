@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Fixed
+
+- **trigger-coolify-deploy**: added `health_check_origin_ip` input so the health check can `curl --resolve` the app's origin IP directly instead of going through Cloudflare. Cloudflare's Bot Fight Mode issues an instant JS challenge (HTTP 403) to GitHub Actions runner IPs on any Cloudflare-proxied hostname, and it runs outside the Ruleset Engine so no Custom Rule can exempt it — without this, health checks against proxied staging/prod hostnames always fail even though the deployment itself succeeded.
+
 ## [4.2.0] - 2026-08-08
 
 

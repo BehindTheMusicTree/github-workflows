@@ -56,6 +56,17 @@ inputs:
       preview's generated fqdn.
     required: false
     default: ""
+  health_check_origin_ip:
+    description: >-
+      Origin server IP to connect the health check directly to (via curl --resolve), bypassing
+      any reverse proxy in front of the health-check hostname. Required for hostnames proxied
+      through Cloudflare: Cloudflare's Bot Fight Mode issues an instant JS challenge (HTTP 403)
+      to GitHub Actions runner IPs on any proxied hostname, and it runs outside the Ruleset
+      Engine, so no Cloudflare Custom Rule can exempt it — the only way to reach the app's real
+      health check is to skip the proxy for this one request. TLS still validates normally
+      since the hostname (SNI/Host) is unchanged, only the connect-to address is overridden.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -75,6 +86,7 @@ runs:
         PREVIEW_NOT_FOUND_TIMEOUT_SECONDS: ${{ inputs.preview_not_found_timeout_seconds }}
         HEALTH_CHECK_PATH: ${{ inputs.health_check_path }}
         HEALTH_CHECK_BASE_URL_OVERRIDE: ${{ inputs.health_check_base_url_override }}
+        HEALTH_CHECK_ORIGIN_IP: ${{ inputs.health_check_origin_ip }}
       run: |
         set -euo pipefail
 
@@ -207,10 +219,19 @@ runs:
           fi
 
           health_url="${base_url%/}${HEALTH_CHECK_PATH}"
-          echo "Health-checking ${health_url} (timeout ${POLL_TIMEOUT_SECONDS}s)..."
+
+          resolve_opts=()
+          if [ -n "$HEALTH_CHECK_ORIGIN_IP" ]; then
+            health_host=$(printf '%s' "$base_url" | sed -E 's#^[a-zA-Z]+://##; s#[/:].*##')
+            resolve_opts=(--resolve "${health_host}:443:${HEALTH_CHECK_ORIGIN_IP}")
+            echo "Health-checking ${health_url} directly via ${HEALTH_CHECK_ORIGIN_IP} (bypassing any proxy in front of ${health_host}), timeout ${POLL_TIMEOUT_SECONDS}s..."
+          else
+            echo "Health-checking ${health_url} (timeout ${POLL_TIMEOUT_SECONDS}s)..."
+          fi
+
           start=$(date +%s)
           while :; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$health_url" || true)
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${resolve_opts[@]}" "$health_url" || true)
             if [ "$code" = "200" ]; then
               echo "Health check passed."
               break

@@ -111,6 +111,7 @@ App-agnostic composite action: trigger a Coolify application deploy via API, pol
 | `preview_not_found_timeout_seconds`| No       | Max seconds to retry a PR-preview deploy trigger while Coolify hasn't created the preview yet. Default `180`         |
 | `health_check_path`                | No       | Path (e.g. `/health`) to poll for HTTP 200 after the deployment finishes                                            |
 | `health_check_base_url_override`   | No       | Base URL to health-check instead of the app's own fqdn. Required when both `pr_number` and `health_check_path` are set (Coolify's API doesn't expose a preview's fqdn) |
+| `health_check_origin_ip`           | No       | Origin server IP to `curl --resolve` the health check directly to, bypassing any reverse proxy in front of the hostname. Needed for Cloudflare-proxied hostnames: Bot Fight Mode 403s GitHub Actions runner IPs on any proxied hostname and runs outside the Ruleset Engine, so no Custom Rule can exempt it |
 
 ```yaml
 - name: Trigger tmd-admin-api deploy
@@ -122,6 +123,7 @@ App-agnostic composite action: trigger a Coolify application deploy via API, pol
     domain: ${{ vars.DOMAIN_NAME }}
     coolify_api_token: ${{ secrets.COOLIFY_API_TOKEN }}
     health_check_path: /health
+    health_check_origin_ip: ${{ vars.SERVER_HOST }} # bypass Cloudflare proxy (Bot Fight Mode 403s CI runners)
 ```
 
 ### Deploy App Env File
