@@ -1,0 +1,227 @@
+# App-agnostic composite action: trigger a Coolify application deploy via API and wait
+# for it to finish (and optionally become healthy) before returning.
+# Used to enforce cross-application deploy ordering (e.g. api before web) from GitHub
+# Actions instead of relying on Coolify's native, unordered git-push auto-deploy.
+name: Trigger Coolify deploy
+
+description: Trigger a Coolify application deploy via API, wait for it to finish, and optionally health-check it
+
+inputs:
+  app_name:
+    description: "Coolify application name (e.g. tmd-admin-api)"
+    required: true
+  coolify_environment:
+    description: "Coolify environment name (production or staging)"
+    required: true
+  coolify_subdomain:
+    description: "Coolify subdomain (e.g. coolify)"
+    required: true
+  domain:
+    description: "Base domain (e.g. example.com)"
+    required: true
+  coolify_api_token:
+    description: "Coolify API token (composite actions have no secrets: block — pass via with:)"
+    required: true
+  pr_number:
+    description: "PR number to target a PR-preview deployment instead of the regular one"
+    required: false
+    default: ""
+  force:
+    description: "Force a fresh deploy even if the commit is already deployed"
+    required: false
+    default: "false"
+  poll_timeout_seconds:
+    description: "Max seconds to wait for the deployment (and health check, if any) to finish"
+    required: false
+    default: "900"
+  poll_interval_seconds:
+    description: "Seconds between deployment/health-check polls"
+    required: false
+    default: "15"
+  preview_not_found_timeout_seconds:
+    description: >-
+      Max seconds to retry triggering a PR-preview deploy while Coolify hasn't created the
+      ApplicationPreview record yet (races Coolify's own webhook-driven preview creation).
+      Ignored when pr_number is not set.
+    required: false
+    default: "180"
+  health_check_path:
+    description: "Optional path (e.g. /health) to poll for HTTP 200 after the deployment finishes"
+    required: false
+    default: ""
+  health_check_base_url_override:
+    description: >-
+      Base URL to health-check against instead of the application's own fqdn. Required when
+      both pr_number and health_check_path are set, since Coolify's API doesn't expose a
+      preview's generated fqdn.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Trigger deploy and wait
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app_name }}
+        COOLIFY_ENVIRONMENT: ${{ inputs.coolify_environment }}
+        COOLIFY_SUBDOMAIN: ${{ inputs.coolify_subdomain }}
+        DOMAIN: ${{ inputs.domain }}
+        COOLIFY_API_TOKEN: ${{ inputs.coolify_api_token }}
+        PR_NUMBER: ${{ inputs.pr_number }}
+        FORCE: ${{ inputs.force }}
+        POLL_TIMEOUT_SECONDS: ${{ inputs.poll_timeout_seconds }}
+        POLL_INTERVAL_SECONDS: ${{ inputs.poll_interval_seconds }}
+        PREVIEW_NOT_FOUND_TIMEOUT_SECONDS: ${{ inputs.preview_not_found_timeout_seconds }}
+        HEALTH_CHECK_PATH: ${{ inputs.health_check_path }}
+        HEALTH_CHECK_BASE_URL_OVERRIDE: ${{ inputs.health_check_base_url_override }}
+      run: |
+        set -euo pipefail
+
+        COOLIFY_API_URL="https://${COOLIFY_SUBDOMAIN}.${DOMAIN}"
+
+        echo "Looking up Coolify app '${APP_NAME}' in environment '${COOLIFY_ENVIRONMENT}'..."
+
+        # /api/v1/applications only exposes environment_id (no nested environment name),
+        # so resolve the target environment's id(s) across all projects first.
+        projects=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+          "${COOLIFY_API_URL}/api/v1/projects")
+
+        env_ids="[]"
+        for project_uuid in $(echo "$projects" | jq -r '.[].uuid'); do
+          project=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_API_URL}/api/v1/projects/${project_uuid}")
+          ids=$(echo "$project" | jq -c --arg env "$COOLIFY_ENVIRONMENT" \
+            '[.environments[] | select(.name == $env) | .id]')
+          env_ids=$(jq -c -n --argjson a "$env_ids" --argjson b "$ids" '$a + $b')
+        done
+
+        apps=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+          "${COOLIFY_API_URL}/api/v1/applications")
+        app_uuid=$(echo "$apps" | jq -r \
+          --arg name "$APP_NAME" \
+          --argjson env_ids "$env_ids" \
+          '.[] | select(.name == $name and (.environment_id | IN($env_ids[]))) | .uuid' | head -1)
+        if [ -z "$app_uuid" ]; then
+          echo "ERROR: No Coolify app found with name '${APP_NAME}' in environment '${COOLIFY_ENVIRONMENT}'"
+          exit 1
+        fi
+        echo "Found app UUID: ${app_uuid}"
+
+        deploy_url="${COOLIFY_API_URL}/api/v1/deploy?uuid=${app_uuid}&force=${FORCE}"
+        if [ -n "$PR_NUMBER" ]; then
+          deploy_url="${deploy_url}&pr=${PR_NUMBER}"
+        fi
+
+        trigger_deploy() {
+          curl -s -w '\n%{http_code}' -X POST \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "$deploy_url"
+        }
+
+        response=""
+        http_code=""
+        if [ -n "$PR_NUMBER" ]; then
+          echo "Triggering deploy for PR #${PR_NUMBER} preview (retrying up to ${PREVIEW_NOT_FOUND_TIMEOUT_SECONDS}s if the preview doesn't exist yet)..."
+          start=$(date +%s)
+          while :; do
+            raw=$(trigger_deploy)
+            http_code=$(printf '%s' "$raw" | tail -1)
+            response=$(printf '%s' "$raw" | sed '$d')
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              break
+            fi
+            if printf '%s' "$response" | grep -qi "not found"; then
+              elapsed=$(( $(date +%s) - start ))
+              if [ "$elapsed" -ge "$PREVIEW_NOT_FOUND_TIMEOUT_SECONDS" ]; then
+                echo "ERROR: PR #${PR_NUMBER} preview not found after ${PREVIEW_NOT_FOUND_TIMEOUT_SECONDS}s: ${response}"
+                exit 1
+              fi
+              echo "  Preview not found yet (${elapsed}s elapsed) — retrying..."
+              sleep "$POLL_INTERVAL_SECONDS"
+              continue
+            fi
+            echo "ERROR: HTTP ${http_code} triggering deploy: ${response}"
+            exit 1
+          done
+        else
+          echo "Triggering deploy..."
+          raw=$(trigger_deploy)
+          http_code=$(printf '%s' "$raw" | tail -1)
+          response=$(printf '%s' "$raw" | sed '$d')
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "ERROR: HTTP ${http_code} triggering deploy: ${response}"
+            exit 1
+          fi
+        fi
+
+        deployment_uuid=$(printf '%s' "$response" | jq -r '.deployments[0].deployment_uuid // empty')
+        if [ -z "$deployment_uuid" ]; then
+          echo "ERROR: No deployment_uuid in response: ${response}"
+          exit 1
+        fi
+        echo "Deployment queued: ${deployment_uuid}"
+
+        echo "Polling deployment status (timeout ${POLL_TIMEOUT_SECONDS}s)..."
+        start=$(date +%s)
+        status=""
+        while :; do
+          status=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_API_URL}/api/v1/deployments/${deployment_uuid}" | jq -r '.status // empty')
+          case "$status" in
+            finished)
+              echo "Deployment finished."
+              break
+              ;;
+            failed|cancelled-by-user)
+              echo "ERROR: Deployment ended with status '${status}'"
+              exit 1
+              ;;
+          esac
+          elapsed=$(( $(date +%s) - start ))
+          if [ "$elapsed" -ge "$POLL_TIMEOUT_SECONDS" ]; then
+            echo "ERROR: Timed out after ${POLL_TIMEOUT_SECONDS}s waiting for deployment (last status: '${status}')"
+            exit 1
+          fi
+          sleep "$POLL_INTERVAL_SECONDS"
+        done
+
+        if [ -n "$HEALTH_CHECK_PATH" ]; then
+          if [ -n "$PR_NUMBER" ]; then
+            if [ -z "$HEALTH_CHECK_BASE_URL_OVERRIDE" ]; then
+              echo "ERROR: health_check_base_url_override is required when both pr_number and health_check_path are set"
+              exit 1
+            fi
+            base_url="$HEALTH_CHECK_BASE_URL_OVERRIDE"
+          else
+            base_url=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+              "${COOLIFY_API_URL}/api/v1/applications/${app_uuid}" | jq -r '.fqdn // empty' | cut -d',' -f1)
+            if [ -z "$base_url" ]; then
+              echo "ERROR: Could not resolve application fqdn for health check"
+              exit 1
+            fi
+            case "$base_url" in
+              http*) : ;;
+              *) base_url="https://${base_url}" ;;
+            esac
+          fi
+
+          health_url="${base_url%/}${HEALTH_CHECK_PATH}"
+          echo "Health-checking ${health_url} (timeout ${POLL_TIMEOUT_SECONDS}s)..."
+          start=$(date +%s)
+          while :; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$health_url" || true)
+            if [ "$code" = "200" ]; then
+              echo "Health check passed."
+              break
+            fi
+            elapsed=$(( $(date +%s) - start ))
+            if [ "$elapsed" -ge "$POLL_TIMEOUT_SECONDS" ]; then
+              echo "ERROR: Timed out after ${POLL_TIMEOUT_SECONDS}s waiting for ${health_url} to return 200 (last: ${code})"
+              exit 1
+            fi
+            sleep "$POLL_INTERVAL_SECONDS"
+          done
+        fi
+
+        echo "Done — '${APP_NAME}' (${COOLIFY_ENVIRONMENT}) deployed${HEALTH_CHECK_PATH:+ and healthy}."
