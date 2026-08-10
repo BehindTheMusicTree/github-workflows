@@ -33,7 +33,7 @@ inputs:
   poll_timeout_seconds:
     description: "Max seconds to wait for the deployment (and health check, if any) to finish"
     required: false
-    default: "900"
+    default: "1800"
   poll_interval_seconds:
     description: "Seconds between deployment/health-check polls"
     required: false
