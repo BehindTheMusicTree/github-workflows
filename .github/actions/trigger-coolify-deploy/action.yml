@@ -174,6 +174,25 @@ runs:
         fi
         echo "Deployment queued: ${deployment_uuid}"
 
+        if [ -n "$PR_NUMBER" ]; then
+          echo "Checking for a still-queued native (webhook-triggered) preview build to cancel..."
+          set +e
+          phantom_uuids=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_API_URL}/api/v1/deployments/applications/${app_uuid}?take=20" | jq -r \
+            --arg pr "$PR_NUMBER" --arg mine "$deployment_uuid" \
+            '.[]? | select((.pull_request_id | tostring) == $pr and .is_webhook == true and .status == "queued" and .deployment_uuid != $mine) | .deployment_uuid')
+          set -e
+          for phantom_uuid in $phantom_uuids; do
+            # Only cancel while still queued: Coolify's cancel endpoint marks an
+            # already-running deployment cancelled without actually killing the build
+            # process (upstream bug), so cancelling once it's in_progress would be a
+            # no-op that just hides a build that's still consuming the build slot.
+            echo "  Cancelling queued native deploy ${phantom_uuid} (PR #${PR_NUMBER})..."
+            curl -s -o /dev/null -X POST -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+              "${COOLIFY_API_URL}/api/v1/deployments/${phantom_uuid}/cancel" || true
+          done
+        fi
+
         echo "Polling deployment status (timeout ${POLL_TIMEOUT_SECONDS}s)..."
         start=$(date +%s)
         status=""
