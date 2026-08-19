@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.2.3] - 2026-08-19
+
+
 ### Added
 
 - **trigger-coolify-deploy**: for PR-preview deploys, cancel any other still-`queued` deployment for the same app+PR before polling. Coolify's native git-push auto-deploy fires a second, unordered build on PR open/reopen alongside this action's own authoritative deploy; the two used to just race harmlessly, but on a host with a single concurrent build slot the phantom build can occupy it and delay/block the real one. Only cancels while `status == "queued"` — a deployment already `in_progress` is left alone, since Coolify's cancel endpoint marks a running deployment cancelled without actually killing the build process (unresolved upstream bug).
