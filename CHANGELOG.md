@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **trigger-coolify-deploy**: for PR-preview deploys, force-stop a phantom native build via SSH (`docker stop` on its build container, named after its `deployment_uuid`) when it's already `in_progress`, in addition to the existing soft-cancel API call — Coolify's cancel endpoint only marks an in-progress deployment cancelled in the DB without actually killing the build process (coollabsio/coolify#5850), so previously an `in_progress` phantom was left running unattended and could exhaust the host's single concurrent-build slot. New `server_host`/`server_deploy_username`/`server_deploy_ssh_private_key` inputs are required whenever `pr_number` is set; missing any of them fails the action immediately rather than silently skipping the force-stop.
+
 ## [4.2.3] - 2026-08-19
 
 
