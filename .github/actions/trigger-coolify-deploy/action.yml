@@ -67,10 +67,58 @@ inputs:
       since the hostname (SNI/Host) is unchanged, only the connect-to address is overridden.
     required: false
     default: ""
+  server_host:
+    description: >-
+      VPS host to SSH into to force-stop a still-running native (webhook-triggered) preview
+      build that would otherwise keep consuming a build slot after this action's own deploy has
+      started (Coolify's cancel API only marks an in-progress deployment cancelled in the DB —
+      it does not stop the build process: coollabsio/coolify#5850). Required whenever pr_number
+      is set — the action fails fast rather than silently skipping the force-stop.
+    required: false
+    default: ""
+  server_deploy_username:
+    description: "SSH username for server_host (see server_host)"
+    required: false
+    default: ""
+  server_deploy_ssh_private_key:
+    description: "SSH private key for server_host (see server_host)"
+    required: false
+    default: ""
 
 runs:
   using: composite
   steps:
+    - name: Check required build-kill inputs
+      if: inputs.pr_number != ''
+      shell: bash
+      env:
+        SERVER_HOST: ${{ inputs.server_host }}
+        SERVER_DEPLOY_USERNAME: ${{ inputs.server_deploy_username }}
+        SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ inputs.server_deploy_ssh_private_key }}
+      run: |
+        missing=()
+        [ -z "$SERVER_HOST" ] && missing+=(server_host)
+        [ -z "$SERVER_DEPLOY_USERNAME" ] && missing+=(server_deploy_username)
+        [ -z "$SERVER_DEPLOY_SSH_PRIVATE_KEY" ] && missing+=(server_deploy_ssh_private_key)
+        if [ "${#missing[@]}" -gt 0 ]; then
+          echo "ERROR: pr_number is set but missing required input(s): ${missing[*]}." >&2
+          echo "PR-preview deploys must be able to force-stop a stuck native build (coollabsio/coolify#5850) — no silent fallback." >&2
+          exit 1
+        fi
+
+    - name: Set up SSH for build-kill fallback
+      if: inputs.pr_number != ''
+      uses: webfactory/ssh-agent@v0.10.0
+      with:
+        ssh-private-key: ${{ inputs.server_deploy_ssh_private_key }}
+
+    - name: Add server to known_hosts
+      if: inputs.pr_number != ''
+      shell: bash
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H "${{ inputs.server_host }}" >> ~/.ssh/known_hosts
+
     - name: Trigger deploy and wait
       shell: bash
       env:
@@ -87,6 +135,8 @@ runs:
         HEALTH_CHECK_PATH: ${{ inputs.health_check_path }}
         HEALTH_CHECK_BASE_URL_OVERRIDE: ${{ inputs.health_check_base_url_override }}
         HEALTH_CHECK_ORIGIN_IP: ${{ inputs.health_check_origin_ip }}
+        SERVER_HOST: ${{ inputs.server_host }}
+        SERVER_DEPLOY_USERNAME: ${{ inputs.server_deploy_username }}
       run: |
         set -euo pipefail
 
@@ -175,22 +225,41 @@ runs:
         echo "Deployment queued: ${deployment_uuid}"
 
         if [ -n "$PR_NUMBER" ]; then
-          echo "Checking for a still-queued native (webhook-triggered) preview build to cancel..."
+          echo "Checking for a still-running native (webhook-triggered) preview build to stop..."
           set +e
-          phantom_uuids=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
-            "${COOLIFY_API_URL}/api/v1/deployments/applications/${app_uuid}?take=20" | jq -r \
+          phantoms=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_API_URL}/api/v1/deployments/applications/${app_uuid}?take=20" | jq -c \
             --arg pr "$PR_NUMBER" --arg mine "$deployment_uuid" \
-            '.[]? | select((.pull_request_id | tostring) == $pr and .is_webhook == true and .status == "queued" and .deployment_uuid != $mine) | .deployment_uuid')
+            '.[]? | select((.pull_request_id | tostring) == $pr and .is_webhook == true and (.status == "queued" or .status == "in_progress") and .deployment_uuid != $mine)')
           set -e
-          for phantom_uuid in $phantom_uuids; do
-            # Only cancel while still queued: Coolify's cancel endpoint marks an
-            # already-running deployment cancelled without actually killing the build
-            # process (upstream bug), so cancelling once it's in_progress would be a
-            # no-op that just hides a build that's still consuming the build slot.
-            echo "  Cancelling queued native deploy ${phantom_uuid} (PR #${PR_NUMBER})..."
+          while IFS= read -r phantom; do
+            [ -z "$phantom" ] && continue
+            phantom_uuid=$(printf '%s' "$phantom" | jq -r '.deployment_uuid')
+            phantom_status=$(printf '%s' "$phantom" | jq -r '.status')
+
+            echo "  Cancelling native deploy ${phantom_uuid} (PR #${PR_NUMBER}, was ${phantom_status})..."
             curl -s -o /dev/null -X POST -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               "${COOLIFY_API_URL}/api/v1/deployments/${phantom_uuid}/cancel" || true
-          done
+
+            if [ "$phantom_status" != "in_progress" ]; then
+              continue
+            fi
+            # Coolify's cancel endpoint only marks an already-running deployment cancelled
+            # in the DB — the build process itself keeps running unattended in the
+            # background (upstream bug: coollabsio/coolify#5850). The only real kill is
+            # docker stop on the build container, which Coolify names after the
+            # deployment_uuid (see ApplicationDeploymentJob::graceful_shutdown_container).
+            # SERVER_HOST/SERVER_DEPLOY_USERNAME presence is already enforced by the
+            # "Check required build-kill inputs" step — no fallback here.
+            if ! printf '%s' "$phantom_uuid" | grep -qE '^[0-9a-f-]{36}$'; then
+              echo "  WARNING: unexpected deployment_uuid format '${phantom_uuid}', skipping force-stop"
+              continue
+            fi
+            echo "  Force-stopping in-progress native build container ${phantom_uuid} via SSH..."
+            ssh -o StrictHostKeyChecking=accept-new "${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}" \
+              "docker stop --time 5 ${phantom_uuid}" \
+              || echo "  WARNING: failed to stop ${phantom_uuid} (may have already finished)"
+          done <<< "$phantoms"
         fi
 
         echo "Polling deployment status (timeout ${POLL_TIMEOUT_SECONDS}s)..."
