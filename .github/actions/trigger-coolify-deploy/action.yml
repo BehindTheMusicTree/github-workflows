@@ -230,7 +230,7 @@ runs:
           phantoms=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
             "${COOLIFY_API_URL}/api/v1/deployments/applications/${app_uuid}?take=20" | jq -c \
             --arg pr "$PR_NUMBER" --arg mine "$deployment_uuid" \
-            '.[]? | select((.pull_request_id | tostring) == $pr and .is_webhook == true and (.status == "queued" or .status == "in_progress") and .deployment_uuid != $mine)')
+            '.deployments[]? | select((.pull_request_id | tostring) == $pr and .is_webhook == true and (.status == "queued" or .status == "in_progress") and .deployment_uuid != $mine)')
           set -e
           while IFS= read -r phantom; do
             [ -z "$phantom" ] && continue

@@ -52,6 +52,12 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.2.5] - 2026-08-23
+
+### Fixed
+
+- **trigger-coolify-deploy**: fixed the phantom-native-build detection query crashing with `jq: error ... Cannot index number with string "pull_request_id"`. `GET /api/v1/deployments/applications/{uuid}` returns `{"deployments": [...], "count": N}`, not a bare array — the filter was iterating `.[]?` over the top-level object's *values* (hitting the numeric `count`) instead of `.deployments[]?`. Because the crash was swallowed by `set +e`, the force-stop added in 4.2.4 silently never ran, leaving phantom native builds free to race the authoritative deploy exactly as before.
+
 ## [4.2.4] - 2026-08-20
 
 ### Added
