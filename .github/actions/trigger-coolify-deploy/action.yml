@@ -260,6 +260,30 @@ runs:
               "docker stop --time 5 ${phantom_uuid}" \
               || echo "  WARNING: failed to stop ${phantom_uuid} (may have already finished)"
           done <<< "$phantoms"
+
+          # Cancelling a queued native/phantom build can collaterally cancel our own
+          # just-queued deployment too — Coolify appears to hold a single queued-build
+          # slot per application, so /cancel on the phantom's uuid can tear down the
+          # whole app's queue entry rather than just the targeted one. Detect that and
+          # re-trigger once rather than failing the workflow on a cancel we didn't ask for.
+          mine_status=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_API_URL}/api/v1/deployments/${deployment_uuid}" | jq -r '.status // empty')
+          if [ "$mine_status" = "cancelled-by-user" ] || [ "$mine_status" = "cancelled" ]; then
+            echo "  Our own queued deployment (${deployment_uuid}) was collaterally cancelled while cancelling the native build — re-triggering..."
+            raw=$(trigger_deploy)
+            http_code=$(printf '%s' "$raw" | tail -1)
+            response=$(printf '%s' "$raw" | sed '$d')
+            if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+              echo "ERROR: HTTP ${http_code} re-triggering deploy after collateral cancel: ${response}"
+              exit 1
+            fi
+            deployment_uuid=$(printf '%s' "$response" | jq -r '.deployments[0].deployment_uuid // empty')
+            if [ -z "$deployment_uuid" ]; then
+              echo "ERROR: No deployment_uuid in re-trigger response: ${response}"
+              exit 1
+            fi
+            echo "  Re-triggered deployment: ${deployment_uuid}"
+          fi
         fi
 
         echo "Polling deployment status (timeout ${POLL_TIMEOUT_SECONDS}s)..."
