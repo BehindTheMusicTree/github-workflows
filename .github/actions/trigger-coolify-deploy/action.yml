@@ -117,8 +117,8 @@ runs:
         [ -z "$SERVER_DEPLOY_USERNAME" ] && missing+=(server_deploy_username)
         [ -z "$SERVER_DEPLOY_SSH_PRIVATE_KEY" ] && missing+=(server_deploy_ssh_private_key)
         if [ "${#missing[@]}" -gt 0 ]; then
-          echo "ERROR: pr_number is set but missing required input(s): ${missing[*]}." >&2
-          echo "PR-preview deploys must be able to force-stop a stuck native build (coollabsio/coolify#5850) — no silent fallback." >&2
+          echo "ERROR: pr_number (or cancel_native_only) is set but missing required input(s): ${missing[*]}." >&2
+          echo "Cancelling/force-stopping a stuck native build (coollabsio/coolify#5850) requires SSH access to the server — no silent fallback." >&2
           exit 1
         fi
 
