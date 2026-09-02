@@ -185,7 +185,7 @@ runs:
             # deployment_uuid comes from the Coolify API response — validate its shape
             # before using it in a URL or SSH command, in case Coolify ever returns
             # something malformed.
-            if ! printf '%s' "$phantom_uuid" | grep -qE '^[0-9a-f-]{36}$'; then
+            if ! printf '%s' "$phantom_uuid" | grep -qiE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
               echo "  WARNING: unexpected deployment_uuid format '${phantom_uuid}', skipping"
               continue
             fi
