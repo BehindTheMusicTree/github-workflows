@@ -182,13 +182,13 @@ runs:
             phantom_uuid=$(printf '%s' "$phantom" | jq -r '.deployment_uuid')
             phantom_status=$(printf '%s' "$phantom" | jq -r '.status')
 
-            # deployment_uuid comes from the Coolify API response — validate its shape
+            # phantom_uuid comes from the Coolify API response — validate its shape
             # before using it in a URL or SSH command, in case Coolify ever returns
             # something malformed. Accepts both the legacy UUID format and Coolify's
             # newer nanoid-style ids (e.g. j9rlp1cg3qdsuqi8sqsvykpo). Uses a bash regex
             # match (not grep) so ^...$ anchors the whole string, not per-line.
             if ! [[ "$phantom_uuid" =~ ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-z]{20,30})$ ]]; then
-              echo "  WARNING: unexpected deployment_uuid format '${phantom_uuid}', skipping"
+              echo "  WARNING: unexpected phantom_uuid format '${phantom_uuid}', skipping"
               continue
             fi
 
