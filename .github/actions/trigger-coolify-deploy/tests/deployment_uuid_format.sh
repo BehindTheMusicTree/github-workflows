@@ -4,11 +4,11 @@
 # if you change one, change both.
 set -euo pipefail
 
-PATTERN='^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-z]{20,30})$'
+PATTERN='^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-z]{20,30})$'
 
 check() {
-  local value="$1" expect="$2" label="$3"
-  if printf '%s' "$value" | grep -qiE "$PATTERN"; then
+  local value="$1" expect="$2" label="$3" actual
+  if [[ "$value" =~ $PATTERN ]]; then
     actual=accept
   else
     actual=reject
