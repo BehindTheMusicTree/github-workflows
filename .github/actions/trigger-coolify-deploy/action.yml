@@ -182,6 +182,14 @@ runs:
             phantom_uuid=$(printf '%s' "$phantom" | jq -r '.deployment_uuid')
             phantom_status=$(printf '%s' "$phantom" | jq -r '.status')
 
+            # deployment_uuid comes from the Coolify API response — validate its shape
+            # before using it in a URL or SSH command, in case Coolify ever returns
+            # something malformed.
+            if ! printf '%s' "$phantom_uuid" | grep -qE '^[0-9a-f-]{36}$'; then
+              echo "  WARNING: unexpected deployment_uuid format '${phantom_uuid}', skipping"
+              continue
+            fi
+
             echo "  Cancelling native deploy ${phantom_uuid} (PR #${PR_NUMBER}, was ${phantom_status})..."
             curl -s -o /dev/null -X POST -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               "${COOLIFY_API_URL}/api/v1/deployments/${phantom_uuid}/cancel" || true
@@ -196,10 +204,6 @@ runs:
             # deployment_uuid (see ApplicationDeploymentJob::graceful_shutdown_container).
             # SERVER_HOST/SERVER_DEPLOY_USERNAME presence is already enforced by the
             # "Check required build-kill inputs" step — no fallback here.
-            if ! printf '%s' "$phantom_uuid" | grep -qE '^[0-9a-f-]{36}$'; then
-              echo "  WARNING: unexpected deployment_uuid format '${phantom_uuid}', skipping force-stop"
-              continue
-            fi
             echo "  Force-stopping in-progress native build container ${phantom_uuid} via SSH..."
             ssh -o StrictHostKeyChecking=accept-new "${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}" \
               "docker stop --time 5 ${phantom_uuid}" \
