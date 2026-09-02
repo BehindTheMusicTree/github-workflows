@@ -170,7 +170,12 @@ runs:
             "${COOLIFY_API_URL}/api/v1/deployments/applications/${app_uuid}?take=20" | jq -c \
             --arg pr "$PR_NUMBER" --arg mine "$mine_uuid" \
             '.deployments[]? | select((.pull_request_id | tostring) == $pr and .is_webhook == true and (.status == "queued" or .status == "in_progress") and .deployment_uuid != $mine)')
+          local query_status=$?
           set -e
+          if [ "$query_status" -ne 0 ]; then
+            echo "  WARNING: failed to query deployments for app ${app_uuid} (exit ${query_status}) — cannot detect native builds to cancel." >&2
+            return 0
+          fi
           while IFS= read -r phantom; do
             [ -z "$phantom" ] && continue
             local phantom_uuid phantom_status
