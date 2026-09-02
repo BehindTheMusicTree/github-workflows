@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.3.1] - 2026-09-02
+
+
 ### Fixed
 
 - **trigger-coolify-deploy**: `cancel_phantom_builds()` now recognizes Coolify's newer nanoid-style `deployment_uuid` values (e.g. `j9rlp1cg3qdsuqi8sqsvykpo`), not just legacy UUIDs. The old UUID-only format check rejected the new IDs as malformed and skipped cancellation, leaving native builds uncancelled and stuck occupying the VPS's single build slot.
