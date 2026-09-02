@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **trigger-coolify-deploy**: new `cancel_native_only` input. When set, the action skips triggering its own deploy entirely and only looks up and force-stops any native (webhook-triggered) build already queued/in-progress for `pr_number`, then exits — for draft PRs, where consumers don't want an authoritative deploy but still want to stop Coolify's unmanaged native build from consuming the host's single build slot. Requires `pr_number`, `server_host`, `server_deploy_username`, and `server_deploy_ssh_private_key`.
+
 ## [4.2.5] - 2026-08-23
 
 ### Fixed

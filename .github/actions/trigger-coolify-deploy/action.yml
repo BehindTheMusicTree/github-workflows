@@ -84,12 +84,28 @@ inputs:
     description: "SSH private key for server_host (see server_host)"
     required: false
     default: ""
+  cancel_native_only:
+    description: >-
+      Skip triggering our own deploy entirely — only look up and force-stop any native
+      (webhook-triggered) preview build already queued/in-progress for pr_number, then exit.
+      For draft PRs, where we don't want an authoritative deploy but still want to stop
+      Coolify's unmanaged native build from consuming the host's single build slot. Requires
+      pr_number, server_host, server_deploy_username, and server_deploy_ssh_private_key.
+    required: false
+    default: "false"
 
 runs:
   using: composite
   steps:
+    - name: Check cancel_native_only requires pr_number
+      if: inputs.cancel_native_only == 'true' && inputs.pr_number == ''
+      shell: bash
+      run: |
+        echo "ERROR: cancel_native_only is true but pr_number is not set — nothing to filter phantom builds by." >&2
+        exit 1
+
     - name: Check required build-kill inputs
-      if: inputs.pr_number != ''
+      if: inputs.pr_number != '' || inputs.cancel_native_only == 'true'
       shell: bash
       env:
         SERVER_HOST: ${{ inputs.server_host }}
@@ -101,19 +117,19 @@ runs:
         [ -z "$SERVER_DEPLOY_USERNAME" ] && missing+=(server_deploy_username)
         [ -z "$SERVER_DEPLOY_SSH_PRIVATE_KEY" ] && missing+=(server_deploy_ssh_private_key)
         if [ "${#missing[@]}" -gt 0 ]; then
-          echo "ERROR: pr_number is set but missing required input(s): ${missing[*]}." >&2
-          echo "PR-preview deploys must be able to force-stop a stuck native build (coollabsio/coolify#5850) — no silent fallback." >&2
+          echo "ERROR: pr_number (or cancel_native_only) is set but missing required input(s): ${missing[*]}." >&2
+          echo "Cancelling/force-stopping a stuck native build (coollabsio/coolify#5850) requires SSH access to the server — no silent fallback." >&2
           exit 1
         fi
 
     - name: Set up SSH for build-kill fallback
-      if: inputs.pr_number != ''
+      if: inputs.pr_number != '' || inputs.cancel_native_only == 'true'
       uses: webfactory/ssh-agent@v0.10.0
       with:
         ssh-private-key: ${{ inputs.server_deploy_ssh_private_key }}
 
     - name: Add server to known_hosts
-      if: inputs.pr_number != ''
+      if: inputs.pr_number != '' || inputs.cancel_native_only == 'true'
       shell: bash
       run: |
         mkdir -p ~/.ssh
@@ -137,10 +153,63 @@ runs:
         HEALTH_CHECK_ORIGIN_IP: ${{ inputs.health_check_origin_ip }}
         SERVER_HOST: ${{ inputs.server_host }}
         SERVER_DEPLOY_USERNAME: ${{ inputs.server_deploy_username }}
+        CANCEL_NATIVE_ONLY: ${{ inputs.cancel_native_only }}
       run: |
         set -euo pipefail
 
         COOLIFY_API_URL="https://${COOLIFY_SUBDOMAIN}.${DOMAIN}"
+
+        # Cancels (soft-cancel API + SSH force-stop for in-progress) any native
+        # (webhook-triggered) deployment still queued/in-progress for $PR_NUMBER on $app_uuid,
+        # excluding $1 (our own deployment_uuid, or "" to exclude none — used by cancel_native_only).
+        cancel_phantom_builds() {
+          local mine_uuid="$1"
+          set +e
+          local phantoms
+          phantoms=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_API_URL}/api/v1/deployments/applications/${app_uuid}?take=20" | jq -c \
+            --arg pr "$PR_NUMBER" --arg mine "$mine_uuid" \
+            '.deployments[]? | select((.pull_request_id | tostring) == $pr and .is_webhook == true and (.status == "queued" or .status == "in_progress") and .deployment_uuid != $mine)')
+          local query_status=$?
+          set -e
+          if [ "$query_status" -ne 0 ]; then
+            echo "  WARNING: failed to query deployments for app ${app_uuid} (exit ${query_status}) — cannot detect native builds to cancel." >&2
+            return 0
+          fi
+          while IFS= read -r phantom; do
+            [ -z "$phantom" ] && continue
+            local phantom_uuid phantom_status
+            phantom_uuid=$(printf '%s' "$phantom" | jq -r '.deployment_uuid')
+            phantom_status=$(printf '%s' "$phantom" | jq -r '.status')
+
+            # deployment_uuid comes from the Coolify API response — validate its shape
+            # before using it in a URL or SSH command, in case Coolify ever returns
+            # something malformed.
+            if ! printf '%s' "$phantom_uuid" | grep -qiE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
+              echo "  WARNING: unexpected deployment_uuid format '${phantom_uuid}', skipping"
+              continue
+            fi
+
+            echo "  Cancelling native deploy ${phantom_uuid} (PR #${PR_NUMBER}, was ${phantom_status})..."
+            curl -s -o /dev/null -X POST -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+              "${COOLIFY_API_URL}/api/v1/deployments/${phantom_uuid}/cancel" || true
+
+            if [ "$phantom_status" != "in_progress" ]; then
+              continue
+            fi
+            # Coolify's cancel endpoint only marks an already-running deployment cancelled
+            # in the DB — the build process itself keeps running unattended in the
+            # background (upstream bug: coollabsio/coolify#5850). The only real kill is
+            # docker stop on the build container, which Coolify names after the
+            # deployment_uuid (see ApplicationDeploymentJob::graceful_shutdown_container).
+            # SERVER_HOST/SERVER_DEPLOY_USERNAME presence is already enforced by the
+            # "Check required build-kill inputs" step — no fallback here.
+            echo "  Force-stopping in-progress native build container ${phantom_uuid} via SSH..."
+            ssh -o StrictHostKeyChecking=accept-new "${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}" \
+              "docker stop --time 5 ${phantom_uuid}" \
+              || echo "  WARNING: failed to stop ${phantom_uuid} (may have already finished)"
+          done <<< "$phantoms"
+        }
 
         echo "Looking up Coolify app '${APP_NAME}' in environment '${COOLIFY_ENVIRONMENT}'..."
 
@@ -169,6 +238,13 @@ runs:
           exit 1
         fi
         echo "Found app UUID: ${app_uuid}"
+
+        if [ "$CANCEL_NATIVE_ONLY" = "true" ]; then
+          echo "cancel_native_only set — stopping any native (webhook-triggered) build for PR #${PR_NUMBER} without triggering our own deploy..."
+          cancel_phantom_builds ""
+          echo "Done — no deploy triggered for '${APP_NAME}' (cancel_native_only)."
+          exit 0
+        fi
 
         deploy_url="${COOLIFY_API_URL}/api/v1/deploy?uuid=${app_uuid}&force=${FORCE}"
         if [ -n "$PR_NUMBER" ]; then
@@ -226,40 +302,7 @@ runs:
 
         if [ -n "$PR_NUMBER" ]; then
           echo "Checking for a still-running native (webhook-triggered) preview build to stop..."
-          set +e
-          phantoms=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
-            "${COOLIFY_API_URL}/api/v1/deployments/applications/${app_uuid}?take=20" | jq -c \
-            --arg pr "$PR_NUMBER" --arg mine "$deployment_uuid" \
-            '.deployments[]? | select((.pull_request_id | tostring) == $pr and .is_webhook == true and (.status == "queued" or .status == "in_progress") and .deployment_uuid != $mine)')
-          set -e
-          while IFS= read -r phantom; do
-            [ -z "$phantom" ] && continue
-            phantom_uuid=$(printf '%s' "$phantom" | jq -r '.deployment_uuid')
-            phantom_status=$(printf '%s' "$phantom" | jq -r '.status')
-
-            echo "  Cancelling native deploy ${phantom_uuid} (PR #${PR_NUMBER}, was ${phantom_status})..."
-            curl -s -o /dev/null -X POST -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
-              "${COOLIFY_API_URL}/api/v1/deployments/${phantom_uuid}/cancel" || true
-
-            if [ "$phantom_status" != "in_progress" ]; then
-              continue
-            fi
-            # Coolify's cancel endpoint only marks an already-running deployment cancelled
-            # in the DB — the build process itself keeps running unattended in the
-            # background (upstream bug: coollabsio/coolify#5850). The only real kill is
-            # docker stop on the build container, which Coolify names after the
-            # deployment_uuid (see ApplicationDeploymentJob::graceful_shutdown_container).
-            # SERVER_HOST/SERVER_DEPLOY_USERNAME presence is already enforced by the
-            # "Check required build-kill inputs" step — no fallback here.
-            if ! printf '%s' "$phantom_uuid" | grep -qE '^[0-9a-f-]{36}$'; then
-              echo "  WARNING: unexpected deployment_uuid format '${phantom_uuid}', skipping force-stop"
-              continue
-            fi
-            echo "  Force-stopping in-progress native build container ${phantom_uuid} via SSH..."
-            ssh -o StrictHostKeyChecking=accept-new "${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}" \
-              "docker stop --time 5 ${phantom_uuid}" \
-              || echo "  WARNING: failed to stop ${phantom_uuid} (may have already finished)"
-          done <<< "$phantoms"
+          cancel_phantom_builds "$deployment_uuid"
 
           # Cancelling a queued native/phantom build can collaterally cancel our own
           # just-queued deployment too — Coolify appears to hold a single queued-build
