@@ -52,6 +52,12 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.3.3] - 2026-09-15
+
+### Fixed
+
+- **trigger-coolify-deploy**: the deployment status polling loop's `status=$(curl -sf ... | jq ...)` call is now guarded the same way as the v4.3.2 fix. It previously could exit non-zero (e.g. exit 22 on a transient non-2xx response) under `set -euo pipefail` and hard-fail the whole action on the very first poll iteration; it now logs a warning and retries on the next poll interval instead.
+
 ## [4.3.2] - 2026-09-15
 
 ### Fixed
