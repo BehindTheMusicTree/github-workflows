@@ -52,6 +52,8 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.3.2] - 2026-09-15
+
 ### Fixed
 
 - **trigger-coolify-deploy**: the post-cancel check for a collaterally-cancelled own deployment (`mine_status=$(curl -sf ...)`) is now guarded with `set +e`/exit-status handling, matching the pattern already used by `cancel_phantom_builds()`'s own query. Previously, an unprotected `curl -sf` there could exit non-zero (e.g. exit 22 on a non-2xx response) under the script's top-level `set -euo pipefail` and hard-fail the whole deploy step instead of gracefully treating the query failure as "not collaterally cancelled".
