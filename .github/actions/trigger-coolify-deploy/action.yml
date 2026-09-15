@@ -311,8 +311,15 @@ runs:
           # slot per application, so /cancel on the phantom's uuid can tear down the
           # whole app's queue entry rather than just the targeted one. Detect that and
           # re-trigger once rather than failing the workflow on a cancel we didn't ask for.
+          set +e
           mine_status=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
             "${COOLIFY_API_URL}/api/v1/deployments/${deployment_uuid}" | jq -r '.status // empty')
+          mine_query_status=$?
+          set -e
+          if [ "$mine_query_status" -ne 0 ]; then
+            echo "  WARNING: failed to query our own deployment ${deployment_uuid} (exit ${mine_query_status}) — assuming it was not collaterally cancelled." >&2
+            mine_status=""
+          fi
           if [ "$mine_status" = "cancelled-by-user" ] || [ "$mine_status" = "cancelled" ]; then
             echo "  Our own queued deployment (${deployment_uuid}) was collaterally cancelled while cancelling the native build — re-triggering..."
             raw=$(trigger_deploy)
