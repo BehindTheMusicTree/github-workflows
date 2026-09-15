@@ -52,6 +52,8 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.3.4] - 2026-09-15
+
 ### Fixed
 
 - **trigger-coolify-deploy**: the PR-preview deploy trigger's retry loop now also retries when Coolify returns HTTP 200 with a "not found" error embedded in the JSON body (no `deployment_uuid`) instead of a non-2xx status. Previously this broke out of the retry loop on the first attempt and hard-failed instead of retrying for up to `PREVIEW_NOT_FOUND_TIMEOUT_SECONDS` while the preview resource was still being provisioned.
