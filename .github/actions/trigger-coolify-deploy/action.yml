@@ -342,8 +342,21 @@ runs:
         start=$(date +%s)
         status=""
         while :; do
+          set +e
           status=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
             "${COOLIFY_API_URL}/api/v1/deployments/${deployment_uuid}" | jq -r '.status // empty')
+          status_query_status=$?
+          set -e
+          if [ "$status_query_status" -ne 0 ]; then
+            echo "  WARNING: failed to query deployment ${deployment_uuid} status (exit ${status_query_status}) — retrying." >&2
+            elapsed=$(( $(date +%s) - start ))
+            if [ "$elapsed" -ge "$POLL_TIMEOUT_SECONDS" ]; then
+              echo "ERROR: Timed out after ${POLL_TIMEOUT_SECONDS}s waiting for deployment (last status query failed)"
+              exit 1
+            fi
+            sleep "$POLL_INTERVAL_SECONDS"
+            continue
+          fi
           case "$status" in
             finished)
               echo "Deployment finished."
