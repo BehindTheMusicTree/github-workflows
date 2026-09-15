@@ -268,7 +268,7 @@ runs:
             raw=$(trigger_deploy)
             http_code=$(printf '%s' "$raw" | tail -1)
             response=$(printf '%s' "$raw" | sed '$d')
-            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ] && printf '%s' "$response" | jq -e '.deployments[0].deployment_uuid' >/dev/null 2>&1; then
               break
             fi
             if printf '%s' "$response" | grep -qi "not found"; then
