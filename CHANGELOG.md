@@ -52,6 +52,15 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **trigger-coolify-deploy**: before triggering, cancels the app's deployments that have been queued/in-progress longer than `poll_timeout_seconds`, so a hung Coolify job no longer silently blocks every later deploy
+- **trigger-coolify-deploy**: optional `discord_webhook_url` input posts a Discord alert when the action fails
+
+### CI
+
+- **test-actions**: added a regression test for the stale-deployment jq filter
+
 ## [4.3.4] - 2026-09-15
 
 ### Fixed

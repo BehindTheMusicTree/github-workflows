@@ -106,12 +106,13 @@ App-agnostic composite action: trigger a Coolify application deploy via API, pol
 | `coolify_api_token`                | Yes      | Coolify API token (composite actions have no `secrets:` block — pass via `with:`)                                     |
 | `pr_number`                        | No       | PR number to target a PR-preview deployment instead of the regular one                                              |
 | `force`                            | No       | Force a fresh deploy even if the commit is already deployed. Default `false`                                        |
-| `poll_timeout_seconds`             | No       | Max seconds to wait for the deployment (and health check, if any) to finish. Default `900`                          |
+| `poll_timeout_seconds`             | No       | Max seconds to wait for the deployment (and health check, if any) to finish; deployments older than this are cancelled as stale before triggering. Default `1800` |
 | `poll_interval_seconds`            | No       | Seconds between deployment/health-check polls. Default `15`                                                         |
 | `preview_not_found_timeout_seconds`| No       | Max seconds to retry a PR-preview deploy trigger while Coolify hasn't created the preview yet. Default `180`         |
 | `health_check_path`                | No       | Path (e.g. `/health`) to poll for HTTP 200 after the deployment finishes                                            |
 | `health_check_base_url_override`   | No       | Base URL to health-check instead of the app's own fqdn. Required when both `pr_number` and `health_check_path` are set (Coolify's API doesn't expose a preview's fqdn) |
 | `health_check_origin_ip`           | No       | Origin server IP to `curl --resolve` the health check directly to, bypassing any reverse proxy in front of the hostname. Needed for Cloudflare-proxied hostnames: Bot Fight Mode 403s GitHub Actions runner IPs on any proxied hostname and runs outside the Ruleset Engine, so no Custom Rule can exempt it |
+| `discord_webhook_url`              | No       | Discord webhook to alert when the action fails (trigger error, deploy failure, or poll timeout)                     |
 
 ```yaml
 - name: Trigger tmd-admin-api deploy
