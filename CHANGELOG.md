@@ -52,6 +52,19 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **trigger-coolify-deploy**: before triggering, cancels the app's deployments that have been queued/in-progress longer than the new `stale_deployment_after_seconds` input (default `3600`), so a hung Coolify job no longer silently blocks every later deploy; stale in-progress builds are also force-stopped over SSH when `server_host` is set
+- **trigger-coolify-deploy**: optional `discord_webhook_url` input posts a Discord alert when the action fails or its job is cancelled
+
+### Changed
+
+- **trigger-coolify-deploy**: the SSH inputs (`server_host`, `server_deploy_username`, `server_deploy_ssh_private_key`) can now be passed for non-PR deploys too; setting any of them requires all three
+
+### CI
+
+- **test-actions**: added a regression test for the stale-deployment jq filter
+
 ## [4.3.4] - 2026-09-15
 
 ### Fixed

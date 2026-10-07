@@ -1,3 +1,4 @@
 .DS_STORE
 .local/
 .github/pr-descriptions/
+.claude/worktrees/

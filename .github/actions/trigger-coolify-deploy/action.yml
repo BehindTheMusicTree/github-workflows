@@ -72,8 +72,10 @@ inputs:
       VPS host to SSH into to force-stop a still-running native (webhook-triggered) preview
       build that would otherwise keep consuming a build slot after this action's own deploy has
       started (Coolify's cancel API only marks an in-progress deployment cancelled in the DB —
-      it does not stop the build process: coollabsio/coolify#5850). Required whenever pr_number
-      is set — the action fails fast rather than silently skipping the force-stop.
+      it does not stop the build process: coollabsio/coolify#5850). Also used to force-stop a
+      stale in-progress build (see stale_deployment_after_seconds). Required whenever pr_number
+      is set — the action fails fast rather than silently skipping the force-stop. Optional
+      otherwise, but setting any of the three SSH inputs requires all three.
     required: false
     default: ""
   server_deploy_username:
@@ -93,6 +95,22 @@ inputs:
       pr_number, server_host, server_deploy_username, and server_deploy_ssh_private_key.
     required: false
     default: "false"
+  stale_deployment_after_seconds:
+    description: >-
+      Before triggering, cancel this app's (or this PR preview's) deployments that have been
+      queued/in-progress longer than this. A Coolify job that dies mid-run leaves its
+      deployment stuck forever, and Coolify runs one deployment per app, so every later
+      trigger is silently dropped. Must exceed poll_timeout_seconds of every caller deploying
+      the same app, or this could cancel a deployment another run is still waiting on.
+    required: false
+    default: "3600"
+  discord_webhook_url:
+    description: >-
+      Discord webhook to alert when this action fails or its job is cancelled (trigger error,
+      deploy failure, poll timeout, or the job's own timeout-minutes). A failed deploy step is
+      otherwise only a red run on GitHub — nothing pages.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -105,7 +123,9 @@ runs:
         exit 1
 
     - name: Check required build-kill inputs
-      if: inputs.pr_number != '' || inputs.cancel_native_only == 'true'
+      if: >-
+        inputs.pr_number != '' || inputs.cancel_native_only == 'true' || inputs.server_host != ''
+        || inputs.server_deploy_username != '' || inputs.server_deploy_ssh_private_key != ''
       shell: bash
       env:
         SERVER_HOST: ${{ inputs.server_host }}
@@ -117,19 +137,19 @@ runs:
         [ -z "$SERVER_DEPLOY_USERNAME" ] && missing+=(server_deploy_username)
         [ -z "$SERVER_DEPLOY_SSH_PRIVATE_KEY" ] && missing+=(server_deploy_ssh_private_key)
         if [ "${#missing[@]}" -gt 0 ]; then
-          echo "ERROR: pr_number (or cancel_native_only) is set but missing required input(s): ${missing[*]}." >&2
+          echo "ERROR: pr_number, cancel_native_only, or another SSH input is set but missing required input(s): ${missing[*]}." >&2
           echo "Cancelling/force-stopping a stuck native build (coollabsio/coolify#5850) requires SSH access to the server — no silent fallback." >&2
           exit 1
         fi
 
     - name: Set up SSH for build-kill fallback
-      if: inputs.pr_number != '' || inputs.cancel_native_only == 'true'
+      if: inputs.server_host != ''
       uses: webfactory/ssh-agent@v0.10.0
       with:
         ssh-private-key: ${{ inputs.server_deploy_ssh_private_key }}
 
     - name: Add server to known_hosts
-      if: inputs.pr_number != '' || inputs.cancel_native_only == 'true'
+      if: inputs.server_host != ''
       shell: bash
       run: |
         mkdir -p ~/.ssh
@@ -146,6 +166,7 @@ runs:
         PR_NUMBER: ${{ inputs.pr_number }}
         FORCE: ${{ inputs.force }}
         POLL_TIMEOUT_SECONDS: ${{ inputs.poll_timeout_seconds }}
+        STALE_DEPLOYMENT_AFTER_SECONDS: ${{ inputs.stale_deployment_after_seconds }}
         POLL_INTERVAL_SECONDS: ${{ inputs.poll_interval_seconds }}
         PREVIEW_NOT_FOUND_TIMEOUT_SECONDS: ${{ inputs.preview_not_found_timeout_seconds }}
         HEALTH_CHECK_PATH: ${{ inputs.health_check_path }}
@@ -158,6 +179,23 @@ runs:
         set -euo pipefail
 
         COOLIFY_API_URL="https://${COOLIFY_SUBDOMAIN}.${DOMAIN}"
+
+        if ! [[ "$STALE_DEPLOYMENT_AFTER_SECONDS" =~ ^[0-9]+$ ]] || [ "$STALE_DEPLOYMENT_AFTER_SECONDS" -le "$POLL_TIMEOUT_SECONDS" ]; then
+          echo "ERROR: stale_deployment_after_seconds (${STALE_DEPLOYMENT_AFTER_SECONDS}) must be an integer above poll_timeout_seconds (${POLL_TIMEOUT_SECONDS}), or it would cancel deployments still being waited on." >&2
+          exit 1
+        fi
+
+        # Coolify's cancel endpoint only marks an already-running deployment cancelled
+        # in the DB — the build process itself keeps running unattended in the
+        # background (upstream bug: coollabsio/coolify#5850). The only real kill is
+        # docker stop on the build container, which Coolify names after the
+        # deployment_uuid (see ApplicationDeploymentJob::graceful_shutdown_container).
+        force_stop_build() {
+          echo "  Force-stopping in-progress build container $1 via SSH..."
+          ssh -o StrictHostKeyChecking=accept-new "${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}" \
+            "docker stop --time 5 $1" \
+            || echo "  WARNING: failed to stop $1 (may have already finished)"
+        }
 
         # Cancels (soft-cancel API + SSH force-stop for in-progress) any native
         # (webhook-triggered) deployment still queued/in-progress for $PR_NUMBER on $app_uuid,
@@ -196,20 +234,11 @@ runs:
             curl -s -o /dev/null -X POST -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               "${COOLIFY_API_URL}/api/v1/deployments/${phantom_uuid}/cancel" || true
 
-            if [ "$phantom_status" != "in_progress" ]; then
-              continue
-            fi
-            # Coolify's cancel endpoint only marks an already-running deployment cancelled
-            # in the DB — the build process itself keeps running unattended in the
-            # background (upstream bug: coollabsio/coolify#5850). The only real kill is
-            # docker stop on the build container, which Coolify names after the
-            # deployment_uuid (see ApplicationDeploymentJob::graceful_shutdown_container).
             # SERVER_HOST/SERVER_DEPLOY_USERNAME presence is already enforced by the
             # "Check required build-kill inputs" step — no fallback here.
-            echo "  Force-stopping in-progress native build container ${phantom_uuid} via SSH..."
-            ssh -o StrictHostKeyChecking=accept-new "${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}" \
-              "docker stop --time 5 ${phantom_uuid}" \
-              || echo "  WARNING: failed to stop ${phantom_uuid} (may have already finished)"
+            if [ "$phantom_status" = "in_progress" ]; then
+              force_stop_build "$phantom_uuid"
+            fi
           done <<< "$phantoms"
         }
 
@@ -247,6 +276,47 @@ runs:
           echo "Done — no deploy triggered for '${APP_NAME}' (cancel_native_only)."
           exit 0
         fi
+
+        # A deployment whose Coolify job died mid-run stays queued/in_progress forever, and
+        # Coolify runs one deployment per app at a time — so every later trigger is silently
+        # dropped and polling it 404s until timeout. /api/v1/deployments lists only active
+        # deployments (unlike the per-app history, which is paginated), and each row's
+        # deployment_url embeds its application uuid.
+        set +e
+        stale=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" "${COOLIFY_API_URL}/api/v1/deployments" \
+          | jq -c --arg app "$app_uuid" --arg pr "${PR_NUMBER:-0}" --argjson max_age "$STALE_DEPLOYMENT_AFTER_SECONDS" \
+          -f "${GITHUB_ACTION_PATH}/stale_deployments.jq")
+        stale_query_status=$?
+        set -e
+        if [ "$stale_query_status" -ne 0 ]; then
+          echo "::warning::Failed to list active Coolify deployments (exit ${stale_query_status}) — cannot detect stale deployments for '${APP_NAME}'."
+          stale=""
+        fi
+        while IFS= read -r deployment; do
+          [ -z "$deployment" ] && continue
+          stale_uuid=$(printf '%s' "$deployment" | jq -r '.deployment_uuid')
+          stale_status=$(printf '%s' "$deployment" | jq -r '.status')
+          stale_created_at=$(printf '%s' "$deployment" | jq -r '.created_at')
+          if ! [[ "$stale_uuid" =~ ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-z]{20,30})$ ]]; then
+            echo "  WARNING: unexpected stale deployment_uuid format '${stale_uuid}', skipping"
+            continue
+          fi
+          if [ "$(printf '%s' "$deployment" | jq -r '.age_seconds')" = "null" ]; then
+            echo "::warning::Active Coolify deployment ${stale_uuid} for '${APP_NAME}' has unparseable created_at '${stale_created_at}' — cannot tell if it is stale, leaving it."
+            continue
+          fi
+          echo "::warning::Cancelling stale Coolify deployment ${stale_uuid} for '${APP_NAME}' (${COOLIFY_ENVIRONMENT}): ${stale_status} since ${stale_created_at}"
+          curl -sf -o /dev/null -X POST -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_API_URL}/api/v1/deployments/${stale_uuid}/cancel" \
+            || echo "  WARNING: failed to cancel stale deployment ${stale_uuid}" >&2
+          if [ "$stale_status" = "in_progress" ]; then
+            if [ -n "$SERVER_HOST" ]; then
+              force_stop_build "$stale_uuid"
+            else
+              echo "::warning::Stale build ${stale_uuid} was only marked cancelled — without server_host its build container may still be running (coollabsio/coolify#5850)."
+            fi
+          fi
+        done <<< "$stale"
 
         deploy_url="${COOLIFY_API_URL}/api/v1/deploy?uuid=${app_uuid}&force=${FORCE}"
         if [ -n "$PR_NUMBER" ]; then
@@ -423,3 +493,20 @@ runs:
         fi
 
         echo "Done — '${APP_NAME}' (${COOLIFY_ENVIRONMENT}) deployed${HEALTH_CHECK_PATH:+ and healthy}."
+
+    - name: Alert Discord on failure
+      if: (failure() || cancelled()) && inputs.discord_webhook_url != ''
+      shell: bash
+      env:
+        DISCORD_WEBHOOK_URL: ${{ inputs.discord_webhook_url }}
+        APP_NAME: ${{ inputs.app_name }}
+        COOLIFY_ENVIRONMENT: ${{ inputs.coolify_environment }}
+        OUTCOME: ${{ job.status == 'cancelled' && 'cancelled' || 'failed' }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        jq -n --arg app "$APP_NAME" --arg env "$COOLIFY_ENVIRONMENT" --arg repo "$GITHUB_REPOSITORY" \
+          --arg ref "$GITHUB_REF_NAME" --arg sha "${GITHUB_SHA:0:7}" --arg url "$RUN_URL" \
+          --arg outcome "$OUTCOME" \
+          '{embeds: [{title: "Coolify deploy \($outcome): \($app) (\($env))", url: $url, color: 15158332,
+            description: "\($repo)@\($ref) (\($sha)) — see the run for details."}]}' \
+          | curl -sf -o /dev/null -X POST -H "Content-Type: application/json" --data @- "$DISCORD_WEBHOOK_URL"

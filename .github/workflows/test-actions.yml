@@ -14,3 +14,6 @@ jobs:
 
       - name: Run deployment_uuid format tests
         run: bash .github/actions/trigger-coolify-deploy/tests/deployment_uuid_format.sh
+
+      - name: Run stale-deployment filter tests
+        run: bash .github/actions/trigger-coolify-deploy/tests/stale_deployment_filter.sh
