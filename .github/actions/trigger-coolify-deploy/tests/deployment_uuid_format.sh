@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regression test for the deployment_uuid/phantom_uuid format check in action.yml
-# (cancel_phantom_builds). Keeps this in sync with the regex at that call site —
+# (cancel_phantom_builds and the stale-deployment cancel). Keeps this in sync with the regex at those call sites —
 # if you change one, change both.
 set -euo pipefail
 

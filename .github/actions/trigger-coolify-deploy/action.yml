@@ -93,6 +93,12 @@ inputs:
       pr_number, server_host, server_deploy_username, and server_deploy_ssh_private_key.
     required: false
     default: "false"
+  discord_webhook_url:
+    description: >-
+      Discord webhook to alert when this action fails (trigger error, deploy failure, or
+      timeout). A failed deploy step is otherwise only a red run on GitHub — nothing pages.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -247,6 +253,34 @@ runs:
           echo "Done — no deploy triggered for '${APP_NAME}' (cancel_native_only)."
           exit 0
         fi
+
+        # A deployment whose Coolify job died mid-run stays queued/in_progress forever, and
+        # Coolify runs one deployment per app at a time — so every later trigger is silently
+        # dropped and polling it 404s until timeout. Anything older than our own poll timeout
+        # is one no caller is still waiting on: cancel it so this deploy can run.
+        set +e
+        stale=$(curl -sf -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+          "${COOLIFY_API_URL}/api/v1/deployments/applications/${app_uuid}?take=20" | jq -c \
+          --arg pr "${PR_NUMBER:-0}" --argjson max_age "$POLL_TIMEOUT_SECONDS" \
+          '.deployments[]? | select((.pull_request_id | tostring) == $pr and (.status == "queued" or .status == "in_progress") and (now - (.created_at | sub("\\.[0-9]+"; "") | sub(" "; "T") | sub("Z?$"; "Z") | fromdateiso8601)) > $max_age)')
+        stale_query_status=$?
+        set -e
+        if [ "$stale_query_status" -ne 0 ]; then
+          echo "  WARNING: failed to query deployments for app ${app_uuid} (exit ${stale_query_status}) — cannot detect stale deployments." >&2
+          stale=""
+        fi
+        while IFS= read -r deployment; do
+          [ -z "$deployment" ] && continue
+          stale_uuid=$(printf '%s' "$deployment" | jq -r '.deployment_uuid')
+          if ! [[ "$stale_uuid" =~ ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-z]{20,30})$ ]]; then
+            echo "  WARNING: unexpected stale deployment_uuid format '${stale_uuid}', skipping"
+            continue
+          fi
+          echo "::warning::Cancelling stale Coolify deployment ${stale_uuid} for '${APP_NAME}' (${COOLIFY_ENVIRONMENT}): $(printf '%s' "$deployment" | jq -r '.status') since $(printf '%s' "$deployment" | jq -r '.created_at')"
+          curl -sf -o /dev/null -X POST -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_API_URL}/api/v1/deployments/${stale_uuid}/cancel" \
+            || echo "  WARNING: failed to cancel stale deployment ${stale_uuid}" >&2
+        done <<< "$stale"
 
         deploy_url="${COOLIFY_API_URL}/api/v1/deploy?uuid=${app_uuid}&force=${FORCE}"
         if [ -n "$PR_NUMBER" ]; then
@@ -423,3 +457,18 @@ runs:
         fi
 
         echo "Done — '${APP_NAME}' (${COOLIFY_ENVIRONMENT}) deployed${HEALTH_CHECK_PATH:+ and healthy}."
+
+    - name: Alert Discord on failure
+      if: failure() && inputs.discord_webhook_url != ''
+      shell: bash
+      env:
+        DISCORD_WEBHOOK_URL: ${{ inputs.discord_webhook_url }}
+        APP_NAME: ${{ inputs.app_name }}
+        COOLIFY_ENVIRONMENT: ${{ inputs.coolify_environment }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        jq -n --arg app "$APP_NAME" --arg env "$COOLIFY_ENVIRONMENT" --arg repo "$GITHUB_REPOSITORY" \
+          --arg ref "$GITHUB_REF_NAME" --arg sha "${GITHUB_SHA:0:7}" --arg url "$RUN_URL" \
+          '{embeds: [{title: "Coolify deploy failed: \($app) (\($env))", url: $url, color: 15158332,
+            description: "\($repo)@\($ref) (\($sha)) — see the run for details."}]}' \
+          | curl -sf -o /dev/null -X POST -H "Content-Type: application/json" --data @- "$DISCORD_WEBHOOK_URL"
