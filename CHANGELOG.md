@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-10-08
+
+
 ### Added
 
 - **trigger-coolify-deploy**: before triggering, cancels the app's deployments that have been queued/in-progress longer than the new `stale_deployment_after_seconds` input (default `3600`), so a hung Coolify job no longer silently blocks every later deploy; stale in-progress builds are also force-stopped over SSH when `server_host` is set
