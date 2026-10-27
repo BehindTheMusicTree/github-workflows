@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.5.1] - 2026-10-27
+
+
 ### Fixed
 
 - **`run-coolify-oneshot` dropped the command's arguments**: the remote shell re-split the command, so `python3 manage.py migrate --no-input` ran as bare `python3` and exited 0 without migrating; every argument is now shell-quoted before it crosses ssh
