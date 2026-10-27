@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-10-27
+
+
 ### Changed
 
 - **`run-coolify-oneshot` requires `coolify_subdomain`, `domain` and `coolify_api_token`**: the one-off container's env now comes from the app's current Coolify config instead of the running container
