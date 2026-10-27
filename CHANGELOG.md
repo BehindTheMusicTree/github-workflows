@@ -52,6 +52,14 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Changed
+
+- **`run-coolify-oneshot` requires `coolify_subdomain`, `domain` and `coolify_api_token`**: the one-off container's env now comes from the app's current Coolify config instead of the running container
+
+### Fixed
+
+- **`run-coolify-oneshot` missed env vars added since the last deploy**: it copied the running container's env, so a release introducing a new variable failed its migrations (e.g. `KeyError: 'CURATION_API_KEY'`)
+
 ## [4.5.1] - 2026-10-27
 
 

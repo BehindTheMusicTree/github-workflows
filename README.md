@@ -131,14 +131,17 @@ App-agnostic composite action: trigger a Coolify application deploy via API, pol
 
 ### Run Coolify One-off Command
 
-App-agnostic composite action: run a one-off command (typically database migrations) in a throwaway container on the Coolify host, from a given image, with the env and network of the app's running container. Use it as a release phase _before_ `trigger-coolify-deploy`, so a slow migration is not bound by Coolify's healthcheck window and can't roll the deploy back. The container's output streams into the job log and its exit code becomes the step's result.
+App-agnostic composite action: run a one-off command (typically database migrations) in a throwaway container on the Coolify host, from a given image, with the app's current Coolify runtime env (read from the Coolify API, so a release that adds an env var migrates with it) and the network of its running container. Use it as a release phase _before_ `trigger-coolify-deploy`, so a slow migration is not bound by Coolify's healthcheck window and can't roll the deploy back. The container's output streams into the job log and its exit code becomes the step's result.
 
 **Action path:** `.github/actions/run-coolify-oneshot`
 
 | Input                           | Required | Description                                                                                          |
 | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| `app_name`                       | Yes      | Coolify application whose single running container supplies the env and network (e.g. `gtmt-api`)    |
+| `app_name`                       | Yes      | Coolify application supplying the env (Coolify API) and network (its single running container) (e.g. `gtmt-api`) |
 | `coolify_environment`            | Yes      | Coolify environment name (`production` or `staging`)                                                 |
+| `coolify_subdomain`              | Yes      | Coolify API subdomain (e.g. `coolify`)                                                               |
+| `domain`                         | Yes      | Base domain (e.g. `example.com`)                                                                     |
+| `coolify_api_token`              | Yes      | Coolify API token allowed to read env values                                                         |
 | `image`                          | Yes      | Image to run, ideally pinned by digest (`ghcr.io/org/app@sha256:...`)                                |
 | `command`                        | Yes      | Command to run, split on whitespace (no quoting support)                                             |
 | `server_host`                    | Yes      | VPS host to SSH into                                                                                 |
@@ -147,14 +150,17 @@ App-agnostic composite action: run a one-off command (typically database migrati
 | `timeout_minutes`                | No       | Max minutes before the command is stopped and the action fails. Default `60`                         |
 | `discord_webhook_url`            | No       | Discord webhook to alert when the command fails, times out or the job is cancelled                   |
 
-Fails fast unless exactly one non-preview container matches `app_name`/`coolify_environment`. Any earlier one-off container for the same app/environment is removed first, so rely on the caller's concurrency group to serialize runs.
+Fails fast if any runtime env var is multiline (not expressible in `--env-file`), or unless exactly one non-preview container matches `app_name`/`coolify_environment`. Any earlier one-off container for the same app/environment is removed first, so rely on the caller's concurrency group to serialize runs.
 
 ```yaml
 - name: Run migrations
-  uses: BehindTheMusicTree/github-workflows/.github/actions/run-coolify-oneshot@v4.5.0
+  uses: BehindTheMusicTree/github-workflows/.github/actions/run-coolify-oneshot@v4.6.0
   with:
     app_name: gtmt-api
     coolify_environment: production
+    coolify_subdomain: ${{ vars.COOLIFY_API_SUBDOMAIN }}
+    domain: ${{ vars.DOMAIN_NAME }}
+    coolify_api_token: ${{ secrets.COOLIFY_API_TOKEN }}
     image: ghcr.io/behindthemusictree/gtmt-api@${{ needs.build.outputs.digest }}
     command: python3 manage.py migrate --no-input
     server_host: ${{ vars.SERVER_HOST }}
