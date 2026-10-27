@@ -14,6 +14,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
   - [Set Image Tags On Server](#set-image-tags-on-server)
   - [Sync env to server](#sync-env-to-server)
   - [Trigger Coolify Deploy](#trigger-coolify-deploy)
+  - [Run Coolify One-off Command](#run-coolify-one-off-command)
   - [Deploy App Env File](#deploy-app-env-file)
   - [Deploy Nginx Env Fragment](#deploy-nginx-env-fragment)
   - [Deploy Partial Docker Compose](#deploy-partial-docker-compose)
@@ -126,6 +127,39 @@ App-agnostic composite action: trigger a Coolify application deploy via API, pol
     coolify_api_token: ${{ secrets.COOLIFY_API_TOKEN }}
     health_check_path: /health
     health_check_origin_ip: ${{ vars.SERVER_HOST }} # bypass Cloudflare proxy (Bot Fight Mode 403s CI runners)
+```
+
+### Run Coolify One-off Command
+
+App-agnostic composite action: run a one-off command (typically database migrations) in a throwaway container on the Coolify host, from a given image, with the env and network of the app's running container. Use it as a release phase _before_ `trigger-coolify-deploy`, so a slow migration is not bound by Coolify's healthcheck window and can't roll the deploy back. The container's output streams into the job log and its exit code becomes the step's result.
+
+**Action path:** `.github/actions/run-coolify-oneshot`
+
+| Input                           | Required | Description                                                                                          |
+| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `app_name`                       | Yes      | Coolify application whose single running container supplies the env and network (e.g. `gtmt-api`)    |
+| `coolify_environment`            | Yes      | Coolify environment name (`production` or `staging`)                                                 |
+| `image`                          | Yes      | Image to run, ideally pinned by digest (`ghcr.io/org/app@sha256:...`)                                |
+| `command`                        | Yes      | Command to run, split on whitespace (no quoting support)                                             |
+| `server_host`                    | Yes      | VPS host to SSH into                                                                                 |
+| `server_deploy_username`         | Yes      | SSH username (must be able to run `docker`)                                                          |
+| `server_deploy_ssh_private_key`  | Yes      | SSH private key for `server_host`                                                                    |
+| `timeout_minutes`                | No       | Max minutes before the command is stopped and the action fails. Default `60`                         |
+| `discord_webhook_url`            | No       | Discord webhook to alert when the command fails, times out or the job is cancelled                   |
+
+Fails fast unless exactly one non-preview container matches `app_name`/`coolify_environment`. Any earlier one-off container for the same app/environment is removed first, so rely on the caller's concurrency group to serialize runs.
+
+```yaml
+- name: Run migrations
+  uses: BehindTheMusicTree/github-workflows/.github/actions/run-coolify-oneshot@v4.5.0
+  with:
+    app_name: gtmt-api
+    coolify_environment: production
+    image: ghcr.io/behindthemusictree/gtmt-api@${{ needs.build.outputs.digest }}
+    command: python3 manage.py migrate --no-input
+    server_host: ${{ vars.SERVER_HOST }}
+    server_deploy_username: ${{ secrets.SERVER_DEPLOY_USERNAME }}
+    server_deploy_ssh_private_key: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
 ```
 
 ### Deploy App Env File

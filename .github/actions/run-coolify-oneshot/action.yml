@@ -1,0 +1,160 @@
+# App-agnostic composite action: run a one-off command (e.g. database migrations) in a throwaway container
+# on the Coolify host, from a given image, with the environment and network of the app's running container.
+# Meant as a release phase before trigger-coolify-deploy: the command runs with no healthcheck window to
+# race, so a slow migration can't roll the deploy back.
+name: Run Coolify one-off command
+
+description: Run a one-off command from an image on the Coolify host, reusing the running app container's env and network
+
+inputs:
+  app_name:
+    description: "Coolify application name whose running container supplies the env and network (e.g. gtmt-api)"
+    required: true
+  coolify_environment:
+    description: "Coolify environment name (production or staging)"
+    required: true
+  image:
+    description: "Image to run, ideally pinned by digest (e.g. ghcr.io/org/app@sha256:...)"
+    required: true
+  command:
+    description: "Command to run in the image, split on whitespace (e.g. python3 manage.py migrate --no-input)"
+    required: true
+  server_host:
+    description: "VPS host to SSH into"
+    required: true
+  server_deploy_username:
+    description: "SSH username for server_host (must be able to run docker)"
+    required: true
+  server_deploy_ssh_private_key:
+    description: "SSH private key for server_host"
+    required: true
+  timeout_minutes:
+    description: "Max minutes the command may run before it is stopped and the action fails"
+    required: false
+    default: "60"
+  discord_webhook_url:
+    description: "Discord webhook to alert when the command fails, times out or the job is cancelled"
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Check required inputs
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app_name }}
+        COOLIFY_ENVIRONMENT: ${{ inputs.coolify_environment }}
+        IMAGE: ${{ inputs.image }}
+        COMMAND: ${{ inputs.command }}
+        SERVER_HOST: ${{ inputs.server_host }}
+        SERVER_DEPLOY_USERNAME: ${{ inputs.server_deploy_username }}
+        SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ inputs.server_deploy_ssh_private_key }}
+        TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
+      run: |
+        missing=()
+        [ -z "$APP_NAME" ] && missing+=(app_name)
+        [ -z "$COOLIFY_ENVIRONMENT" ] && missing+=(coolify_environment)
+        [ -z "$IMAGE" ] && missing+=(image)
+        [ -z "$COMMAND" ] && missing+=(command)
+        [ -z "$SERVER_HOST" ] && missing+=(server_host)
+        [ -z "$SERVER_DEPLOY_USERNAME" ] && missing+=(server_deploy_username)
+        [ -z "$SERVER_DEPLOY_SSH_PRIVATE_KEY" ] && missing+=(server_deploy_ssh_private_key)
+        if [ "${#missing[@]}" -gt 0 ]; then
+          echo "ERROR: missing required input(s): ${missing[*]}." >&2
+          exit 1
+        fi
+        if ! [[ "$TIMEOUT_MINUTES" =~ ^[1-9][0-9]*$ ]]; then
+          echo "ERROR: timeout_minutes must be a positive integer, got '$TIMEOUT_MINUTES'." >&2
+          exit 1
+        fi
+
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.10.0
+      with:
+        ssh-private-key: ${{ inputs.server_deploy_ssh_private_key }}
+
+    - name: Add server to known_hosts
+      shell: bash
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H "${{ inputs.server_host }}" >> ~/.ssh/known_hosts
+
+    - name: Run command on server
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app_name }}
+        COOLIFY_ENVIRONMENT: ${{ inputs.coolify_environment }}
+        IMAGE: ${{ inputs.image }}
+        COMMAND: ${{ inputs.command }}
+        SERVER_HOST: ${{ inputs.server_host }}
+        SERVER_DEPLOY_USERNAME: ${{ inputs.server_deploy_username }}
+        TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
+        RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      run: |
+        # The script is piped over stdin, so the remote shell's own stdin is the script itself: every
+        # command that could read stdin gets </dev/null.
+        ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+          "${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}" \
+          bash -s -- "$APP_NAME" "$COOLIFY_ENVIRONMENT" "$IMAGE" "$TIMEOUT_MINUTES" "$RUN_ID" "$COMMAND" <<'REMOTE'
+        set -euo pipefail
+        app=$1 env_name=$2 image=$3 timeout_minutes=$4 run_id=$5 command=$6
+        name_prefix="${app}-oneshot-${env_name}"
+        name="${name_prefix}-${run_id}"
+
+        containers=$(docker ps --filter "label=coolify.resourceName=${app}" \
+          --filter "label=coolify.environmentName=${env_name}" \
+          --filter "label=coolify.pullRequestId=0" --format '{{.Names}}' </dev/null)
+        if [ "$(printf '%s\n' "$containers" | grep -c .)" -ne 1 ]; then
+          echo "ERROR: expected exactly one running ${app} (${env_name}) container, found: ${containers:-none}" >&2
+          exit 1
+        fi
+        echo "Reusing env and network of ${containers}"
+
+        env_file=$(mktemp)
+        cleanup() {
+          rm -f "$env_file"
+          docker rm -f "$name" >/dev/null 2>&1 || true
+        }
+        trap cleanup EXIT
+
+        # A cancelled job can't always stop its remote container; the workflow's concurrency group
+        # serializes runs, so any earlier one-off for this app/env is stale.
+        docker ps -aq --filter "name=^${name_prefix}-" </dev/null | xargs -r docker rm -f >/dev/null
+
+        docker inspect "$containers" --format '{{range .Config.Env}}{{println .}}{{end}}' >"$env_file" </dev/null
+        network=$(docker inspect "$containers" \
+          --format '{{range $k, $_ := .NetworkSettings.Networks}}{{println $k}}{{end}}' </dev/null | head -n1)
+
+        docker pull -q "$image" </dev/null
+
+        read -r -a cmd <<<"$command"
+        echo "Running: ${command}"
+        set +e
+        timeout --signal=TERM "${timeout_minutes}m" \
+          docker run --rm --name "$name" --network "$network" --env-file "$env_file" "$image" "${cmd[@]}" </dev/null
+        status=$?
+        set -e
+        if [ "$status" -eq 124 ]; then
+          echo "ERROR: command exceeded ${timeout_minutes} minutes and was stopped." >&2
+        fi
+        exit "$status"
+        REMOTE
+
+    - name: Alert Discord on failure
+      if: (failure() || cancelled()) && inputs.discord_webhook_url != ''
+      shell: bash
+      env:
+        DISCORD_WEBHOOK_URL: ${{ inputs.discord_webhook_url }}
+        APP_NAME: ${{ inputs.app_name }}
+        COOLIFY_ENVIRONMENT: ${{ inputs.coolify_environment }}
+        COMMAND: ${{ inputs.command }}
+        OUTCOME: ${{ job.status == 'cancelled' && 'cancelled' || 'failed' }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        jq -n --arg app "$APP_NAME" --arg env "$COOLIFY_ENVIRONMENT" --arg repo "$GITHUB_REPOSITORY" \
+          --arg ref "$GITHUB_REF_NAME" --arg sha "${GITHUB_SHA:0:7}" --arg url "$RUN_URL" \
+          --arg outcome "$OUTCOME" --arg cmd "$COMMAND" \
+          '{embeds: [{title: "One-off command \($outcome): \($app) (\($env))", url: $url, color: 15158332,
+            description: "`\($cmd)` — \($repo)@\($ref) (\($sha)) — see the run for details."}]}' \
+          | curl -sf -o /dev/null -X POST -H "Content-Type: application/json" --data @- "$DISCORD_WEBHOOK_URL"
