@@ -52,6 +52,12 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- **Run Coolify One-off Command**: new `run-coolify-oneshot` composite action
+  - Runs a command (e.g. `manage.py migrate`) from a given image on the Coolify host, reusing the running app container's env and network, so migrations can run as a release phase outside Coolify's healthcheck window
+  - Fails fast on missing inputs or when the app doesn't have exactly one running container, enforces `timeout_minutes`, cleans up its container on exit, and can alert Discord on failure
+
 ## [4.4.0] - 2026-10-08
 
 
