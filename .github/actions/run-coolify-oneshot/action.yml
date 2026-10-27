@@ -94,9 +94,11 @@ runs:
       run: |
         # The script is piped over stdin, so the remote shell's own stdin is the script itself: every
         # command that could read stdin gets </dev/null.
+        # ssh joins its arguments with spaces and the remote shell re-splits them, so each one is shell-quoted.
+        remote_args=$(printf ' %q' "$APP_NAME" "$COOLIFY_ENVIRONMENT" "$IMAGE" "$TIMEOUT_MINUTES" "$RUN_ID" "$COMMAND")
         ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
           "${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}" \
-          bash -s -- "$APP_NAME" "$COOLIFY_ENVIRONMENT" "$IMAGE" "$TIMEOUT_MINUTES" "$RUN_ID" "$COMMAND" <<'REMOTE'
+          "bash -s --${remote_args}" <<'REMOTE'
         set -euo pipefail
         app=$1 env_name=$2 image=$3 timeout_minutes=$4 run_id=$5 command=$6
         name_prefix="${app}-oneshot-${env_name}"
