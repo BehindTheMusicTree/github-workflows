@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-10-27
+
+
 ### Added
 
 - **Run Coolify One-off Command**: new `run-coolify-oneshot` composite action
