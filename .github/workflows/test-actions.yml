@@ -17,3 +17,12 @@ jobs:
 
       - name: Run stale-deployment filter tests
         run: bash .github/actions/trigger-coolify-deploy/tests/stale_deployment_filter.sh
+
+  check-api-version-tests:
+    name: check-api-version shell tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run check-api-version tests
+        run: bash .github/actions/check-api-version/tests/check_api_version.sh

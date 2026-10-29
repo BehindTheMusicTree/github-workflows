@@ -168,6 +168,24 @@ Fails fast if any runtime env var is multiline (not expressible in `--env-file`)
     server_deploy_ssh_private_key: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
 ```
 
+### Check API Version
+
+App-agnostic composite action: fail unless an API's health endpoint reports a version at or above a required minimum. Use it to stop a frontend release from shipping ahead of the API release it depends on. It fails on an unreachable endpoint, a missing or malformed `version`, or a version below the minimum.
+
+**Action path:** `.github/actions/check-api-version`
+
+| Input         | Required | Description                                                                 |
+| ------------- | -------- | --------------------------------------------------------------------------- |
+| `health_url`  | Yes      | Health endpoint returning JSON with a top-level semver `version`            |
+| `min_version` | Yes      | Minimum acceptable API version, `X.Y.Z`                                     |
+
+```yaml
+- uses: BehindTheMusicTree/github-workflows/.github/actions/check-api-version@v4.7.0
+  with:
+    health_url: https://grow-api.${{ vars.DOMAIN_NAME }}/health/
+    min_version: 14.5.0
+```
+
 ### Deploy App Env File
 
 Uploads compose env files to `pool/compose/<app_name>/` on the server. Caller must upload an artifact (e.g. `app-env-files`) containing env files. Use **non-dotfile names** in the artifact (e.g. `env_api`, `env_gtmt_front`) so `upload-artifact` includes them; this workflow renames them to dotfiles (e.g. `.env_api`) before uploading.
