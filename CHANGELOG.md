@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-10-29
+
+
 ### Added
 
 - **`check-api-version` action**: fails unless an API's health endpoint reports a version at or above `min_version`, so a frontend release can't ship ahead of the API release it needs. Fails on an unreachable endpoint, a missing or malformed version, or a version below the minimum; covered by shell tests in the `Test actions` workflow
