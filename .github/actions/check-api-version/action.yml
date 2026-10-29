@@ -1,0 +1,23 @@
+# App-agnostic composite action: fail unless an API's health endpoint reports a version >= min_version.
+# Used to stop a frontend release from shipping ahead of the API release it depends on.
+name: Check API version
+
+description: Fail unless the API's health endpoint reports a version at or above a required minimum
+
+inputs:
+  health_url:
+    description: "Health endpoint returning JSON with a top-level semver `version` (e.g. https://api.example.com/health/)"
+    required: true
+  min_version:
+    description: "Minimum acceptable API version, X.Y.Z"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check API version
+      shell: bash
+      env:
+        HEALTH_URL: ${{ inputs.health_url }}
+        MIN_VERSION: ${{ inputs.min_version }}
+      run: bash "${{ github.action_path }}/check-api-version.sh" "$HEALTH_URL" "$MIN_VERSION"
