@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Changed
+
+- Agent rules: migrated `.cursor/rules/*.mdc` to `.claude/rules/*.md` (`globs` → `paths`) and removed the remaining Cursor-specific files and references.
+
 ## [4.7.0] - 2026-10-29
 
 

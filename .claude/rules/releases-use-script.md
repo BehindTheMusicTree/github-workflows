@@ -1,6 +1,5 @@
 ---
 description: Use release script for every new release request
-alwaysApply: true
 ---
 
 # Releases Must Use Script
