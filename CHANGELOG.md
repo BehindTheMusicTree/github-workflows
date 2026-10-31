@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- Validate portable agent instructions and skill adapters in caller repositories with a pinned public engine.
+
 ### Changed
 
 - Agent rules: migrated `.cursor/rules/*.mdc` to `.claude/rules/*.md` (`globs` → `paths`) and removed the remaining Cursor-specific files and references.

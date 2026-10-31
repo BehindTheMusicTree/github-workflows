@@ -1,0 +1,25 @@
+name: Agent drift
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  agent-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out caller
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Check out public agent-config v1.1.0
+        uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/agent-config
+          ref: 1e199e26e8c5d8778d94547b96d42d6c075bc7e7
+          path: .agent-config-engine
+          persist-credentials: false
+      - name: Check project adapters
+        run: python3 .agent-config-engine/scripts/check-project-agents.py "$GITHUB_WORKSPACE"
