@@ -26,3 +26,17 @@ jobs:
 
       - name: Run check-api-version tests
         run: bash .github/actions/check-api-version/tests/check_api_version.sh
+
+  agent-drift-tests:
+    name: agent drift fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/agent-config
+          ref: 1e199e26e8c5d8778d94547b96d42d6c075bc7e7
+          path: .agent-config-engine
+          persist-credentials: false
+      - name: Verify compliant and divergent fixtures
+        run: bash .github/tests/agent-drift.sh "$GITHUB_WORKSPACE/.agent-config-engine/scripts/check-project-agents.py"

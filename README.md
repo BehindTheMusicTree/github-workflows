@@ -9,6 +9,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 ## Table of Contents
 
 - [Available Workflows](#available-workflows)
+  - [Agent drift](#agent-drift)
   - [Actionlint](#actionlint)
   - [Call Redeployment Webhook](#call-redeployment-webhook)
   - [Set Image Tags On Server](#set-image-tags-on-server)
@@ -35,6 +36,22 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - [License](#license)
 
 ## Available Workflows
+
+### Agent drift
+
+Checks a caller project that has adopted the portable `AGENTS.md` / `CLAUDE.md` and skill-link conventions. It uses the public agent-config v1.1.0 engine pinned to commit `1e199e26e8c5d8778d94547b96d42d6c075bc7e7`, with read-only repository permissions and no private extension. It checks structure and configured scoped rules; it does not assess the accuracy of instructions or agent runtime loading.
+
+Call from a workflow on pull requests and pin the reusable workflow to a released version of this repository:
+
+```yaml
+jobs:
+  agent-drift:
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/agent-drift.yml@<release-tag-or-commit>
+    permissions:
+      contents: read
+```
+
+The caller checkout must contain `AGENTS.md` and a `CLAUDE.md` importing it. The check is read-only. See the [agent-config documentation](https://github.com/BehindTheMusicTree/agent-config) for the adapter contract.
 
 ### Actionlint
 
