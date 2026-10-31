@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-10-31
+
+
 ### Added
 
 - Validate portable agent instructions and skill adapters in caller repositories with a pinned public engine.
