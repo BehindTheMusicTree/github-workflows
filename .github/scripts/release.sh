@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: .github/scripts/release.sh <major|minor|patch>
+Usage: .github/scripts/release.sh <major|minor|patch|publish>
 
 Example:
   .github/scripts/release.sh patch
@@ -15,8 +15,9 @@ This script:
   1) Adds a new release section under [Unreleased] in CHANGELOG.md
   2) Bumps VERSION
   3) Creates a commit
-  4) Creates a tag
-  5) Pushes the tag to origin
+  4) Leaves the commit on the current feature branch for a PR
+
+After that PR merges, run publish on updated main to tag and push the merged commit.
 EOF
 }
 
@@ -26,13 +27,44 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || $# -ne 1 ]]; then
 fi
 
 bump_type="$1"
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+if [[ "$bump_type" == "publish" ]]; then
+  if [[ "$(git branch --show-current)" != "main" ]] || [[ -n "$(git status --porcelain)" ]]; then
+    echo "ERROR: publish requires a clean main checkout." >&2
+    exit 1
+  fi
+  git fetch origin main --tags
+  if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+    echo "ERROR: main must match origin/main before publishing." >&2
+    exit 1
+  fi
+  version="$(tr -d '[:space:]' < VERSION)"
+  if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || ! grep -Fq "## [$version] - " CHANGELOG.md; then
+    echo "ERROR: VERSION must match a versioned changelog entry." >&2
+    exit 1
+  fi
+  tag="v${version}"
+  if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+    echo "ERROR: tag ${tag} already exists; verify it before retrying." >&2
+    exit 1
+  fi
+  git tag "$tag" HEAD
+  git push origin "refs/tags/$tag"
+  echo "Published $tag at $(git rev-parse HEAD)"
+  exit 0
+fi
+
 if [[ "$bump_type" != "major" && "$bump_type" != "minor" && "$bump_type" != "patch" ]]; then
   echo "ERROR: argument must be one of: major, minor, patch (got: '$bump_type')."
   exit 1
 fi
 
-repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root"
+if [[ "$(git branch --show-current)" == "main" ]] || [[ -z "$(git branch --show-current)" ]]; then
+  echo "ERROR: prepare the release on a feature branch for a PR." >&2
+  exit 1
+fi
 
 if [[ ! -f CHANGELOG.md ]]; then
   echo "ERROR: CHANGELOG.md not found at repo root."
@@ -176,10 +208,8 @@ printf '%s\n' "$version" > VERSION
 
 git add CHANGELOG.md VERSION
 git commit -m "chore(release): ${tag}"
-git tag "$tag"
-git push origin "$tag"
 
 echo "Release prepared."
 echo "- Version: ${effective_version} -> ${version} (VERSION file before bump: ${current_version})"
-echo "- Tag created and pushed: ${tag}"
-echo "- Commit created locally (not pushed): chore(release): ${tag}"
+echo "- Commit created locally: chore(release): ${tag}"
+echo "- Open a PR to main, then run .github/scripts/release.sh publish on updated main."

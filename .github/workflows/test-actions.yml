@@ -40,3 +40,11 @@ jobs:
           persist-credentials: false
       - name: Verify compliant and divergent fixtures
         run: bash .github/tests/agent-drift.sh "$GITHUB_WORKSPACE/.agent-config-engine/scripts/check-project-agents.py"
+
+  release-script-tests:
+    name: release script tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify prepare and publish
+        run: bash .github/scripts/tests/release.sh
