@@ -185,33 +185,11 @@ After opening the PR, maintainers will review and may request changes. Once appr
 
 Releases are made from `main`.
 
-1. **Ensure you're on `main` and up to date**
-
-   ```bash
-   git checkout main
-   git pull origin main
-   ```
-
-2. **Run the release script**
-
-```bash
-  .github/scripts/release.sh patch
-```
-
-- Accepts exactly one bump type: `major`, `minor`, or `patch`
-- Computes the next version from the current root `VERSION` file
-- Moves current `[Unreleased]` entries under a new section `## [0.2.0] - YYYY-MM-DD`
-- Bumps the root `VERSION` file
-- Creates commit `chore(release): vX.Y.Z`
-- Creates tag `vX.Y.Z` and pushes that tag to `origin`
-
-3. **Push commit to `main`**
-
-   ```bash
-   git push origin main
-   ```
-
-4. **Create a GitHub Release** (optional) from the tag and paste the changelog section for that version.
+1. Create a feature branch from an up-to-date `main`.
+2. Run `.github/scripts/release.sh minor` (or `patch` / `major`) on the feature branch. The script updates the changelog and version and commits them without creating a tag.
+3. Push the branch, open a PR to `main`, and merge it after review and checks.
+4. Update a clean local `main` to the merged commit, then run `.github/scripts/release.sh publish`. The script checks that `main` matches `origin/main`, creates the version tag on the merged commit, and pushes it.
+5. Optionally create a GitHub Release from that tag and include the version's changelog section.
 
 ## License & Attribution
 
