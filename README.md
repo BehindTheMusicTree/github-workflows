@@ -195,6 +195,9 @@ App-agnostic composite action: fail unless an API's health endpoint reports a ve
 | ------------- | -------- | --------------------------------------------------------------------------- |
 | `health_url`  | Yes      | Health endpoint returning JSON with a top-level semver `version`            |
 | `min_version` | Yes      | Minimum acceptable API version, `X.Y.Z`                                     |
+| `origin_ip`   | No       | Connect to this origin IP using the HTTPS URL's hostname and TLS verification |
+
+When set, `origin_ip` selects the destination explicitly; the action never retries through another route after a failure.
 
 ```yaml
 - uses: BehindTheMusicTree/github-workflows/.github/actions/check-api-version@v4.7.0

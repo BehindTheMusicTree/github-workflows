@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- Allow `check-api-version` to connect to an explicit HTTPS origin IP while preserving hostname and TLS verification; report HTTP failures separately from connection failures.
+
 ## [4.8.0] - 2026-10-31
 
 
