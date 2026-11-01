@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Changed
+
+- Use the deployment SSH host variable for the image-tag synchronization workflow.
+
 ## [4.9.0] - 2026-11-01
 
 

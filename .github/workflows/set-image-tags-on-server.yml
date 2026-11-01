@@ -1,5 +1,5 @@
 # Reusable workflow: write pooled image-tag manifest for one stack and env.
-# Caller must have vars SERVER_HOST and IMAGE_TAGS_POOL_DIR and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
+# Caller must have vars DEPLOY_SSH_HOST and IMAGE_TAGS_POOL_DIR and secrets SERVER_DEPLOY_USERNAME, SERVER_DEPLOY_SSH_PRIVATE_KEY.
 name: Set image tags on server
 
 on:
@@ -33,11 +33,11 @@ jobs:
     name: Set image tags manifest on server
     runs-on: ubuntu-latest
     env:
-      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.SERVER_HOST }}
+      SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DEPLOY_SSH_HOST }}
     steps:
       - name: Check required vars and secrets
         env:
-          SERVER_HOST: ${{ vars.SERVER_HOST }}
+          SERVER_HOST: ${{ vars.DEPLOY_SSH_HOST }}
           IMAGE_TAGS_POOL_DIR: ${{ vars.IMAGE_TAGS_POOL_DIR }}
           SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
           SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
@@ -97,7 +97,7 @@ jobs:
       - name: Add host to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ vars.DEPLOY_SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Build manifest file
         id: manifest

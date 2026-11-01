@@ -93,7 +93,7 @@ Writes one pooled stack/env image-tags manifest on the server (atomic `*.new` th
 | `release_id`  | No       | Optional release id metadata (`RELEASE_ID=`)              |
 | `release_sha` | No       | Optional git SHA metadata (`RELEASE_SHA=`)                |
 
-Required caller config: `vars.SERVER_HOST`, `vars.IMAGE_TAGS_POOL_DIR` (e.g. `/srv/btmt/image-tags`), `secrets.SERVER_DEPLOY_USERNAME`, `secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY`.
+Required caller config: `vars.DEPLOY_SSH_HOST`, `vars.IMAGE_TAGS_POOL_DIR` (e.g. `/srv/btmt/image-tags`), `secrets.SERVER_DEPLOY_USERNAME`, `secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY`.
 
 ### Sync env to server
 
@@ -143,7 +143,7 @@ App-agnostic composite action: trigger a Coolify application deploy via API, pol
     domain: ${{ vars.DOMAIN_NAME }}
     coolify_api_token: ${{ secrets.COOLIFY_API_TOKEN }}
     health_check_path: /health
-    health_check_origin_ip: ${{ vars.SERVER_HOST }} # bypass Cloudflare proxy (Bot Fight Mode 403s CI runners)
+    health_check_origin_ip: ${{ vars.APP_ORIGIN_IP }} # bypass Cloudflare proxy (Bot Fight Mode 403s CI runners)
 ```
 
 ### Run Coolify One-off Command
@@ -180,7 +180,7 @@ Fails fast if any runtime env var is multiline (not expressible in `--env-file`)
     coolify_api_token: ${{ secrets.COOLIFY_API_TOKEN }}
     image: ghcr.io/behindthemusictree/gtmt-api@${{ needs.build.outputs.digest }}
     command: python3 manage.py migrate --no-input
-    server_host: ${{ vars.SERVER_HOST }}
+    server_host: ${{ vars.DEPLOY_SSH_HOST }}
     server_deploy_username: ${{ secrets.SERVER_DEPLOY_USERNAME }}
     server_deploy_ssh_private_key: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
 ```
