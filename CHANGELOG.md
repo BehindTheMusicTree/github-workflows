@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-01
+
+
 ### Changed
 
 - Use a dedicated webhook host variable for the reusable redeployment workflow.
