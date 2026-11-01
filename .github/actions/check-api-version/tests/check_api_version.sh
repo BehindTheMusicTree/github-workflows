@@ -38,4 +38,40 @@ check 'not json' 14.5.0 fail "non-JSON payload"
 check '{"version":"14.5.0"}' 14.5 fail "malformed min_version"
 check __missing__ 14.5.0 fail "unreachable endpoint"
 
+mkdir "$tmp/bin"
+cat > "$tmp/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$CURL_ARGS"
+while (($#)); do
+  if [[ "$1" == -o ]]; then
+    printf '%s' '{"version":"14.7.0"}' > "$2"
+    break
+  fi
+  shift
+done
+printf '%s' "$CURL_STATUS"
+exit "$CURL_EXIT"
+EOF
+chmod +x "$tmp/bin/curl"
+export PATH="$tmp/bin:$PATH" CURL_ARGS="$tmp/args" CURL_STATUS=200 CURL_EXIT=0
+bash "$script" https://api.example.com/health/ 14.7.0 192.0.2.10 >/dev/null
+grep -Fx -- '--resolve' "$CURL_ARGS" >/dev/null
+grep -Fx -- 'api.example.com:443:192.0.2.10' "$CURL_ARGS" >/dev/null
+grep -Fx -- 'https://api.example.com/health/' "$CURL_ARGS" >/dev/null
+for code in 403 500; do
+  export CURL_STATUS="$code"
+  if output="$(bash "$script" https://api.example.com/health/ 14.7.0 192.0.2.10)"; then
+    echo "FAIL: HTTP $code accepted"; exit 1
+  fi
+  [[ "$output" == *"HTTP $code received"* ]]
+done
+for code in 28 60; do
+  export CURL_EXIT="$code" CURL_STATUS=000
+  if output="$(bash "$script" https://api.example.com/health/ 14.7.0 192.0.2.10)"; then
+    echo "FAIL: curl error $code accepted"; exit 1
+  fi
+  [[ "$output" == *"Could not reach"* ]]
+done
+echo "ok: origin routing and HTTP, timeout and TLS failures"
+
 echo "All check-api-version checks passed."

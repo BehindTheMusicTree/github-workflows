@@ -11,6 +11,9 @@ inputs:
   min_version:
     description: "Minimum acceptable API version, X.Y.Z"
     required: true
+  origin_ip:
+    description: "Optional origin IP for the HTTPS health endpoint"
+    required: false
 
 runs:
   using: composite
@@ -20,4 +23,5 @@ runs:
       env:
         HEALTH_URL: ${{ inputs.health_url }}
         MIN_VERSION: ${{ inputs.min_version }}
-      run: bash "${{ github.action_path }}/check-api-version.sh" "$HEALTH_URL" "$MIN_VERSION"
+        ORIGIN_IP: ${{ inputs.origin_ip }}
+      run: bash "${{ github.action_path }}/check-api-version.sh" "$HEALTH_URL" "$MIN_VERSION" "$ORIGIN_IP"
