@@ -54,6 +54,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Changed
 
+- Use a dedicated webhook host variable for the reusable redeployment workflow.
+
+### Changed
+
 - Use the deployment SSH host variable for the image-tag synchronization workflow.
 
 ## [4.9.0] - 2026-11-01

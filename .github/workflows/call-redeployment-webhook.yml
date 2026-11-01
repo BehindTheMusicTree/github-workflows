@@ -40,7 +40,7 @@ on:
         type: string
     secrets:
       REDEPLOYMENT_WEBHOOK_PORT:
-        description: Webhook daemon port on SERVER_HOST.
+        description: Webhook daemon port on REDEPLOYMENT_WEBHOOK_HOST.
         required: false
       BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD:
         description: X-Secret for BTMT prod when hook_id_base equals vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE.
@@ -103,7 +103,7 @@ jobs:
         env:
           ENV: ${{ needs.validate-env.outputs.env_normalized }}
           HOOK_BASE: ${{ needs.validate-env.outputs.hook_id_base_effective }}
-          SERVER_HOST: ${{ vars.SERVER_HOST }}
+          REDEPLOYMENT_WEBHOOK_HOST: ${{ vars.REDEPLOYMENT_WEBHOOK_HOST }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           BTMT_HOOK_VAR: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}
           TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}
@@ -117,7 +117,7 @@ jobs:
         run: |
           trim() { echo -n "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
           missing=""
-          [[ -z "${SERVER_HOST:-}" ]] && missing="${missing} SERVER_HOST"
+          [[ -z "${REDEPLOYMENT_WEBHOOK_HOST:-}" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_HOST"
           [[ -z "${REDEPLOYMENT_WEBHOOK_PORT:-}" ]] && missing="${missing} REDEPLOYMENT_WEBHOOK_PORT"
           [[ -z "${HOOK_BASE:-}" ]] && missing="${missing} hook_id_base"
           btmt_ref=$(trim "${BTMT_HOOK_VAR:-}")
@@ -166,7 +166,7 @@ jobs:
         env:
           ENV: ${{ needs.validate-env.outputs.env_normalized }}
           HOOK_BASE: ${{ needs.validate-env.outputs.hook_id_base_effective }}
-          SERVER_HOST: ${{ vars.SERVER_HOST }}
+          REDEPLOYMENT_WEBHOOK_HOST: ${{ vars.REDEPLOYMENT_WEBHOOK_HOST }}
           REDEPLOYMENT_WEBHOOK_PORT: ${{ secrets.REDEPLOYMENT_WEBHOOK_PORT }}
           BTMT_HOOK_VAR: ${{ vars.BTMT_REDEPLOYMENT_HOOK_ID_BASE }}
           TMD_HOOK_VAR: ${{ vars.TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE }}
@@ -210,7 +210,7 @@ jobs:
             echo "ERROR: hook_id_base '${hook_trim}' does not match any known app (BTMT_REDEPLOYMENT_HOOK_ID_BASE, TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE, TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE)."
             exit 1
           fi
-          SERVER_REDEPLOYMENT_WEBHOOK_URL="http://${SERVER_HOST}:${REDEPLOYMENT_WEBHOOK_PORT}/hooks/${hook_trim}-${ENV}"
+          SERVER_REDEPLOYMENT_WEBHOOK_URL="http://${REDEPLOYMENT_WEBHOOK_HOST}:${REDEPLOYMENT_WEBHOOK_PORT}/hooks/${hook_trim}-${ENV}"
           export SERVER_REDEPLOYMENT_WEBHOOK_URL
           export REDEPLOYMENT_WEBHOOK_SECRET="$secret"
           set +e
