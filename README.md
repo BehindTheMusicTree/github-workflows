@@ -302,7 +302,7 @@ This repo only contains workflow definitions. Each repository that **calls** the
 
 | Type     | Name                                       | Description                                                                                       |
 | -------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Variable | `SERVER_HOST`                              | VPS IP or hostname for webhook URL (use when main domain points elsewhere, e.g. Vercel)           |
+| Variable | `REDEPLOYMENT_WEBHOOK_HOST`                | VPS IP or hostname for webhook URL (use when main domain points elsewhere, e.g. Vercel)           |
 | Variable | `BTMT_REDEPLOYMENT_HOOK_ID_BASE`           | Base hook id; URL path is `/hooks/<BTMT_REDEPLOYMENT_HOOK_ID_BASE>-<env>` (e.g. `myhook-staging`) |
 | Secret   | `REDEPLOYMENT_WEBHOOK_PORT`                | Port the webhook service listens on                                                               |
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_STAGING` | Webhook secret for BTMT env `staging` (X-Secret header)                                           |
@@ -370,20 +370,21 @@ The webhook workflow fails with clear errors if:
 
 ## Webhook Endpoint
 
-The workflow builds the URL using **SERVER_HOST** (the webhook runs on the VPS; use VPS IP when the main domain points elsewhere, e.g. Vercel):
+The workflow builds the URL using **REDEPLOYMENT_WEBHOOK_HOST** (the webhook runs on the VPS; use VPS IP when the main domain points elsewhere, e.g. Vercel):
 
 ```
-http://<SERVER_HOST>:<REDEPLOYMENT_WEBHOOK_PORT>/hooks/<BTMT_REDEPLOYMENT_HOOK_ID_BASE>-<env>
+http://<REDEPLOYMENT_WEBHOOK_HOST>:<REDEPLOYMENT_WEBHOOK_PORT>/hooks/<BTMT_REDEPLOYMENT_HOOK_ID_BASE>-<env>
 ```
 
-Example: `SERVER_HOST=203.0.113.10`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `BTMT_REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=staging`  
+Example: `REDEPLOYMENT_WEBHOOK_HOST=203.0.113.10`, `REDEPLOYMENT_WEBHOOK_PORT=9000`, `BTMT_REDEPLOYMENT_HOOK_ID_BASE=btmt-redeploy`, `env=staging`
+
 → `http://203.0.113.10:9000/hooks/btmt-redeploy-staging`
 
 Manual check (use the secret for the env you target):
 
 ```bash
 curl -v -X POST -H "Content-Type: application/json" -H "X-Secret: YOUR_SECRET" -d '{}' --max-time 15 \
-  http://<SERVER_HOST>:9000/hooks/btmt-redeploy-staging
+  http://<REDEPLOYMENT_WEBHOOK_HOST>:9000/hooks/btmt-redeploy-staging
 ```
 
 ## Troubleshooting
