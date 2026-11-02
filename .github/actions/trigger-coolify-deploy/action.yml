@@ -128,12 +128,12 @@ runs:
         || inputs.server_deploy_username != '' || inputs.server_deploy_ssh_private_key != ''
       shell: bash
       env:
-        SERVER_HOST: ${{ inputs.server_host }}
+        SSH_TARGET_HOST: ${{ inputs.server_host }}
         SERVER_DEPLOY_USERNAME: ${{ inputs.server_deploy_username }}
         SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ inputs.server_deploy_ssh_private_key }}
       run: |
         missing=()
-        [ -z "$SERVER_HOST" ] && missing+=(server_host)
+        [ -z "$SSH_TARGET_HOST" ] && missing+=(server_host)
         [ -z "$SERVER_DEPLOY_USERNAME" ] && missing+=(server_deploy_username)
         [ -z "$SERVER_DEPLOY_SSH_PRIVATE_KEY" ] && missing+=(server_deploy_ssh_private_key)
         if [ "${#missing[@]}" -gt 0 ]; then
@@ -172,7 +172,7 @@ runs:
         HEALTH_CHECK_PATH: ${{ inputs.health_check_path }}
         HEALTH_CHECK_BASE_URL_OVERRIDE: ${{ inputs.health_check_base_url_override }}
         HEALTH_CHECK_ORIGIN_IP: ${{ inputs.health_check_origin_ip }}
-        SERVER_HOST: ${{ inputs.server_host }}
+        SSH_TARGET_HOST: ${{ inputs.server_host }}
         SERVER_DEPLOY_USERNAME: ${{ inputs.server_deploy_username }}
         CANCEL_NATIVE_ONLY: ${{ inputs.cancel_native_only }}
       run: |
@@ -192,7 +192,7 @@ runs:
         # deployment_uuid (see ApplicationDeploymentJob::graceful_shutdown_container).
         force_stop_build() {
           echo "  Force-stopping in-progress build container $1 via SSH..."
-          ssh -o StrictHostKeyChecking=accept-new "${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}" \
+          ssh -o StrictHostKeyChecking=accept-new "${SERVER_DEPLOY_USERNAME}@${SSH_TARGET_HOST}" \
             "docker stop --time 5 $1" \
             || echo "  WARNING: failed to stop $1 (may have already finished)"
         }
@@ -234,7 +234,7 @@ runs:
             curl -s -o /dev/null -X POST -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               "${COOLIFY_API_URL}/api/v1/deployments/${phantom_uuid}/cancel" || true
 
-            # SERVER_HOST/SERVER_DEPLOY_USERNAME presence is already enforced by the
+            # SSH_TARGET_HOST/SERVER_DEPLOY_USERNAME presence is already enforced by the
             # "Check required build-kill inputs" step — no fallback here.
             if [ "$phantom_status" = "in_progress" ]; then
               force_stop_build "$phantom_uuid"
@@ -310,7 +310,7 @@ runs:
             "${COOLIFY_API_URL}/api/v1/deployments/${stale_uuid}/cancel" \
             || echo "  WARNING: failed to cancel stale deployment ${stale_uuid}" >&2
           if [ "$stale_status" = "in_progress" ]; then
-            if [ -n "$SERVER_HOST" ]; then
+            if [ -n "$SSH_TARGET_HOST" ]; then
               force_stop_build "$stale_uuid"
             else
               echo "::warning::Stale build ${stale_uuid} was only marked cancelled — without server_host its build container may still be running (coollabsio/coolify#5850)."

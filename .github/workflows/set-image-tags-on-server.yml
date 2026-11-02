@@ -37,12 +37,12 @@ jobs:
     steps:
       - name: Check required vars and secrets
         env:
-          SERVER_HOST: ${{ vars.DEPLOY_SSH_HOST }}
+          SSH_TARGET_HOST: ${{ vars.DEPLOY_SSH_HOST }}
           IMAGE_TAGS_POOL_DIR: ${{ vars.IMAGE_TAGS_POOL_DIR }}
           SERVER_DEPLOY_USERNAME: ${{ secrets.SERVER_DEPLOY_USERNAME }}
           SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
         run: |
-          required=(SERVER_HOST IMAGE_TAGS_POOL_DIR SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
+          required=(SSH_TARGET_HOST IMAGE_TAGS_POOL_DIR SERVER_DEPLOY_USERNAME SERVER_DEPLOY_SSH_PRIVATE_KEY)
           missing=()
           for v in "${required[@]}"; do
             [ -z "${!v}" ] && missing+=("$v")

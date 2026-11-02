@@ -52,6 +52,11 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Changed
+
+- Clarify SSH target naming in deployment actions and remove obsolete workflow documentation.
+
+
 ## [5.0.0] - 2026-11-01
 
 
@@ -367,7 +372,6 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Added
 
-- **call-redeployment-webhook** (`workflow_call` / `workflow_dispatch`): Optional input **`hook_id_base`** and optional secret **`redeployment_webhook_secret`**. When **`hook_id_base`** is non-empty after trim, the workflow validates **`SERVER_HOST`**, **`REDEPLOYMENT_WEBHOOK_PORT`**, **`hook_id_base`**, and **`redeployment_webhook_secret`**, then POSTs **`/hooks/<hook_id_base>-<env>`** with **`X-Secret`** from **`redeployment_webhook_secret`** (same **`Redeployment accepted`** body check). **BehindTheMusicTree/infrastructure** uses this for **The Music Deck admin** staging after **`provision`**, passing **`hook_id_base`** from **`TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`**. BTMT callers stay unchanged: omit **`hook_id_base`** (or pass empty) and use **`secrets: inherit`** with **`REDEPLOYMENT_HOOK_ID_BASE`** / **`REDEPLOYMENT_WEBHOOK_SECRET_*`**. Declared **`workflow_call`** secrets: **`REDEPLOYMENT_WEBHOOK_PORT`**, **`REDEPLOYMENT_WEBHOOK_SECRET_PROD`**, **`REDEPLOYMENT_WEBHOOK_SECRET_STAGING`**, **`redeployment_webhook_secret`** (all optional for **`inherit`**; TMD-only callers pass **`REDEPLOYMENT_WEBHOOK_PORT`** + **`redeployment_webhook_secret`** explicitly).
 
 ## [0.1.5] - 2026-04-28
 
@@ -379,13 +383,11 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Documentation
 
-- **Variable naming**: Replaced the last `VPS_IP` reference in docs/changelog with `SERVER_HOST` for consistent terminology
 
 ## [0.1.3] - 2026-04-18
 
 ### Changed
 
-- **call-redeployment-webhook**: Standardized on `SERVER_HOST` variable naming for consistency across workflows
 
 ## [0.1.2] - 2026-04-18
 
@@ -395,9 +397,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Changed
 
-- **Webhook URL construction**: Host IP variable is now named `SERVER_HOST` instead of `VPS_IP`.
 
-- **Webhook and SSH use SERVER_HOST**: call-redeployment-webhook and set-image-tag-on-server now use variable **SERVER_HOST** (instead of DOMAIN_NAME) for the webhook URL host and SSH destination. Use when the main domain points elsewhere (e.g. Vercel). Callers must set **SERVER_HOST** in the environment (repo or org variables).
 
 - **Webhook ID**: REDEPLOYMENT_HOOK_ID is no longer a secret but now a var
 
