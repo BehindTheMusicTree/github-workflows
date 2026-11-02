@@ -52,6 +52,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-11-02
+
+
 ### Changed
 
 - Clarify SSH target naming in deployment actions and remove obsolete workflow documentation.
