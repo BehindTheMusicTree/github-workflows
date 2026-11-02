@@ -95,20 +95,6 @@ Writes one pooled stack/env image-tags manifest on the server (atomic `*.new` th
 
 Required caller config: `vars.DEPLOY_SSH_HOST`, `vars.IMAGE_TAGS_POOL_DIR` (e.g. `/srv/btmt/image-tags`), `secrets.SERVER_DEPLOY_USERNAME`, `secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY`.
 
-### Sync env to server
-
-App-agnostic reusable: upload an env fragment into **`ENV_POOL_DIR`** on the server (atomic write). Redeploy (**BehindTheMusicTree/infrastructure**) promotes pool → **`scripts/sync-env/`** via **`promote-sync-env-to-canonical.sh`**; compose generators read canonical sync-env files, not merged keys in **`scripts/.env`**.
-
-**Workflow file:** `.github/workflows/sync-env-to-server.yml`
-
-| Input               | Required | Description                                                                             |
-| ------------------- | -------- | --------------------------------------------------------------------------------------- |
-| `sync_env`          | Yes      | `prod` or `staging` (lowercase)                                                         |
-| `app_name`          | Yes      | App name for fragment path (e.g. `htmt-api`)                                            |
-| `fragment_artifact` | Yes      | Artifact name and path to fragment file (e.g. `sync-env-fragment-staging/fragment.env`) |
-
-**Caller must:** (1) Build the fragment in a job (app-specific keys), write it to a file (e.g. `fragment.env`), and upload it with `actions/upload-artifact` using the same artifact name. (2) Have a job that calls this workflow with `needs: build-fragment`, `secrets: inherit`, and inputs `sync_env`, `app_name`, `fragment_artifact`. Required **vars** (repo or environment): `SERVER_HOST`, `ENV_POOL_DIR`, `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE`, and either `HTMT_API_APP_NAME` or `APP_NAME` (app name for fragment path). Required **secrets**: `SERVER_DEPLOY_USERNAME`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`, plus any vars/secrets for the keys included in the fragment (see workflow: `FRAGMENT_KEYS` and the “Build env fragment” step). Trigger **redeploy** after sync so promoted **`sync-env`** files reach **`compose/*.env`** / compose generation. To support a new app or new keys, add the key to `FRAGMENT_KEYS` and to the Build env fragment step env in this repo.
-
 ### Trigger Coolify Deploy
 
 App-agnostic composite action: trigger a Coolify application deploy via API, poll it to a terminal status (`finished`/`failed`/`cancelled-by-user`), and optionally HTTP health-check it before returning. Use this to enforce cross-application deploy ordering (e.g. deploy an API before its dependent web app) instead of relying on Coolify's native, unordered git-push auto-deploy — most useful on single-build-slot Coolify instances where two order-dependent builds triggered independently can otherwise deadlock or race.
@@ -309,33 +295,6 @@ This repo only contains workflow definitions. Each repository that **calls** the
 | Secret   | `BTMT_REDEPLOYMENT_WEBHOOK_SECRET_PROD`    | Webhook secret for BTMT env `prod`                                                                |
 
 When **`hook_id_base`** equals **`TMD_ADMIN_API_REDEPLOYMENT_HOOK_ID_BASE`** (repository variable, trimmed), **`X-Secret`** uses **`TMD_ADMIN_API_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_API_WEBHOOK_SECRET_STAGING`**. When **`hook_id_base`** equals **`TMD_ADMIN_WEB_REDEPLOYMENT_HOOK_ID_BASE`**, **`X-Secret`** uses **`TMD_ADMIN_WEB_WEBHOOK_SECRET_PROD`** / **`TMD_ADMIN_WEB_WEBHOOK_SECRET_STAGING`**. Any other `hook_id_base` fails fast (no fallback). **`REDEPLOYMENT_WEBHOOK_PORT`** is always required.
-
-### Sync env to server
-
-Required by **sync-env-to-server** (caller’s environment):
-
-| Type     | Name                                   | Description                                                                      |
-| -------- | -------------------------------------- | -------------------------------------------------------------------------------- |
-| Variable | `SERVER_HOST`                          | VPS IP or hostname for SSH                                                       |
-| Variable | `ENV_POOL_DIR`                         | Server pool directory where env fragments are stored (e.g. `/srv/btmt/env-pool`) |
-| Variable | `SYNC_ENV_REMOTE_FILENAME_PREFIX_BASE` | Fragment filename prefix (e.g. `sync-env-`)                                      |
-| Variable | `HTMT_API_APP_NAME` or `APP_NAME`      | App name for fragment path (e.g. `htmt-api`)                                     |
-| Secret   | `SERVER_DEPLOY_USERNAME`               | SSH user                                                                         |
-| Secret   | `SERVER_DEPLOY_SSH_PRIVATE_KEY`        | SSH private key                                                                  |
-
-Plus any vars/secrets for the fragment keys (see workflow; add new keys in the reusable when needed).
-
-### Deploy workflows
-
-Required by **deploy-app-env-file**, **deploy-nginx-env-fragment**, and **deploy-docker-compose-part** (caller’s environment must have these):
-
-| Type     | Name                            | Description                                                                                                    |
-| -------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Variable | `REDEPLOYMENT_ROOT`             | Redeployment tree root (e.g. `/var/webhook/redeployment`); pool/compose paths use `{REDEPLOYMENT_ROOT}-{env}/` |
-| Variable | `DOCKER_COMPOSE_DIR_NAME`       | Compose dir name under redeploy dir                                                                            |
-| Variable | `SERVER_HOST`                   | VPS IP or hostname for SSH                                                                                     |
-| Secret   | `SERVER_DEPLOY_USERNAME`        | SSH user for deploy                                                                                            |
-| Secret   | `SERVER_DEPLOY_SSH_PRIVATE_KEY` | SSH private key for deploy                                                                                     |
 
 ## Setup Instructions
 

@@ -61,7 +61,7 @@ runs:
         COOLIFY_API_TOKEN: ${{ inputs.coolify_api_token }}
         IMAGE: ${{ inputs.image }}
         COMMAND: ${{ inputs.command }}
-        SERVER_HOST: ${{ inputs.server_host }}
+        SSH_TARGET_HOST: ${{ inputs.server_host }}
         SERVER_DEPLOY_USERNAME: ${{ inputs.server_deploy_username }}
         SERVER_DEPLOY_SSH_PRIVATE_KEY: ${{ inputs.server_deploy_ssh_private_key }}
         TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
@@ -74,7 +74,7 @@ runs:
         [ -z "$COOLIFY_API_TOKEN" ] && missing+=(coolify_api_token)
         [ -z "$IMAGE" ] && missing+=(image)
         [ -z "$COMMAND" ] && missing+=(command)
-        [ -z "$SERVER_HOST" ] && missing+=(server_host)
+        [ -z "$SSH_TARGET_HOST" ] && missing+=(server_host)
         [ -z "$SERVER_DEPLOY_USERNAME" ] && missing+=(server_deploy_username)
         [ -z "$SERVER_DEPLOY_SSH_PRIVATE_KEY" ] && missing+=(server_deploy_ssh_private_key)
         if [ "${#missing[@]}" -gt 0 ]; then
@@ -143,13 +143,13 @@ runs:
         COOLIFY_ENVIRONMENT: ${{ inputs.coolify_environment }}
         IMAGE: ${{ inputs.image }}
         COMMAND: ${{ inputs.command }}
-        SERVER_HOST: ${{ inputs.server_host }}
+        SSH_TARGET_HOST: ${{ inputs.server_host }}
         SERVER_DEPLOY_USERNAME: ${{ inputs.server_deploy_username }}
         TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
         RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         LOCAL_ENV_FILE: ${{ steps.env.outputs.file }}
       run: |
-        target="${SERVER_DEPLOY_USERNAME}@${SERVER_HOST}"
+        target="${SERVER_DEPLOY_USERNAME}@${SSH_TARGET_HOST}"
         env_file=$(ssh "$target" 'umask 077; mktemp')
         trap 'rm -f "$LOCAL_ENV_FILE"; ssh "$target" "rm -f $env_file" || true' EXIT
         scp -q "$LOCAL_ENV_FILE" "${target}:${env_file}"
