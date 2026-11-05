@@ -14,7 +14,7 @@
       "items": { "$ref": "#/$defs/versionSource" },
       "uniqueItems": true
     },
-    "tag_prefix": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$" },
+    "tag_prefix": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_-]+$" },
     "changelog": { "type": "string", "minLength": 1 },
     "outputs": {
       "type": "object",
