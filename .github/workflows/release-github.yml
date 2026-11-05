@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: BehindTheMusicTree/github-workflows
-          ref: 8ae00ab34e74ffe16977cf28bdc93ecd6724ed6d
+          ref: bbd93e5c3ba2335515b35e1a163f305db51478d7
           persist-credentials: false
           path: foundation
       - name: Validate and publish the existing tag
