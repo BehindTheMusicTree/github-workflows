@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BehindTheMusicTree/github-workflows/release-policy.schema.json",
+  "title": "Release policy",
+  "description": "Explicit version and publication contract for a repository.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["release_branch", "version", "mirrors", "tag_prefix", "changelog", "outputs"],
+  "properties": {
+    "release_branch": { "const": "main" },
+    "version": { "$ref": "#/$defs/versionSource" },
+    "mirrors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/versionSource" },
+      "uniqueItems": true
+    },
+    "tag_prefix": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$" },
+    "changelog": { "type": "string", "minLength": 1 },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["github_release", "packages"],
+      "properties": {
+        "github_release": { "type": "boolean" },
+        "packages": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "versionSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "format"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "format": { "enum": ["text", "json", "toml"] },
+        "key": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        { "if": { "properties": { "format": { "const": "text" } } }, "then": { "not": { "required": ["key"] } }, "else": { "required": ["key"] } }
+      ]
+    }
+  }
+}

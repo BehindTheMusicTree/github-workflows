@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Added
+
+- Draft release policy schema and example for explicitly declaring version sources and outputs.
+
 ## [5.0.1] - 2026-11-02
 
 

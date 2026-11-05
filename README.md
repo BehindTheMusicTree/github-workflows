@@ -392,3 +392,7 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed history of changes, including ve
 ## License
 
 [Specify your license here]
+
+## Release policy (under development)
+
+The proposed [release policy schema](release/release-policy.schema.json) records a repository's canonical version source, version mirrors, changelog, tag prefix, and expected outputs. See the [example](examples/release-policy.json). JSON and TOML sources use a dot-separated key; text sources contain only the version. Version values must be stable SemVer. This schema is a draft contract: no workflow consumes it or creates tags yet.
