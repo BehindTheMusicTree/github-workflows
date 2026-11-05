@@ -9,4 +9,4 @@ permissions:
 
 jobs:
   publish:
-    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-github.yml@91a81d064801fe3c2e460882067220b3cb39d542
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-github.yml@7857565a0fbbf7a4569147044d14eb7350df82c3

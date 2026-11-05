@@ -54,6 +54,8 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Fixed
 
+- Preserve complete release notes when Markdown examples contain version headings.
+
 - Release validation and publication preserve complete changelog notes containing fenced Markdown headings and ignore fenced version examples.
 
 ### Changed
