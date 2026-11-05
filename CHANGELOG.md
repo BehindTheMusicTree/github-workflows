@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Changed
+
+- Adopt CI-owned tags and changelog-based GitHub publication for this repository, preserving script-based release preparation.
+
 ### Added
 
 - Verify existing npm artifacts by name, version and archive integrity when resuming partial multi-package publications.

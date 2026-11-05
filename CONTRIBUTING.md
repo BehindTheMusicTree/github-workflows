@@ -188,8 +188,10 @@ Releases are made from `main`.
 1. Create a feature branch from an up-to-date `main`.
 2. Run `.github/scripts/release.sh minor` (or `patch` / `major`) on the feature branch. The script updates the changelog and version and commits them without creating a tag.
 3. Push the branch, open a PR to `main`, and merge it after review and checks.
-4. Update a clean local `main` to the merged commit, then run `.github/scripts/release.sh publish`. The script checks that `main` matches `origin/main`, creates the version tag on the merged commit, and pushes it.
-5. Optionally create a GitHub Release from that tag and include the version's changelog section.
+4. CI validates the release policy, canonical `VERSION`, nonempty matching changelog notes and main ancestry. It creates an annotated tag on the exact merged commit through the release App.
+5. The tag workflow publishes the GitHub Release using those changelog notes. Rerun a failed workflow to recover; an existing release is retained. Local `publish` is refused once `.github/release-policy.json` is present.
+
+Initial adoption keeps version 5.0.1 and creates no tag. App access and tag protections are activated separately in `github-config` before preparing a subsequent release. The reusable workflows in this repository remain pinned by consumers; this adoption does not repin them.
 
 ## License & Attribution
 
