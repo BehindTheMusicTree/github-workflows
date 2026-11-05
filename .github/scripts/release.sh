@@ -31,6 +31,10 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
 if [[ "$bump_type" == "publish" ]]; then
+  if [[ -f .github/release-policy.json ]]; then
+    echo "ERROR: CI owns tagging for this repository; follow the release workflow run." >&2
+    exit 1
+  fi
   if [[ "$(git branch --show-current)" != "main" ]] || [[ -n "$(git status --porcelain)" ]]; then
     echo "ERROR: publish requires a clean main checkout." >&2
     exit 1

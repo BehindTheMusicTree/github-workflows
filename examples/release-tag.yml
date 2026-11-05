@@ -1,0 +1,15 @@
+# Place at .github/workflows/release-tag.yml in an adopting repository.
+name: Release tag
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  release:
+    # Replace with the full merged, reviewed github-workflows commit SHA.
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@REPLACE_WITH_MERGED_COMMIT_SHA
+    with:
+      app-id: ${{ vars.RELEASE_APP_ID }}
+    secrets:
+      release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

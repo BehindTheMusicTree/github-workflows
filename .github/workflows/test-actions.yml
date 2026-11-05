@@ -48,3 +48,15 @@ jobs:
       - uses: actions/checkout@v5
       - name: Verify prepare and publish
         run: bash .github/scripts/tests/release.sh
+
+  release-foundation-tests:
+    name: release foundation tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify validation, collisions and retries without remote writes
+        run: python3 -m unittest discover -s release -p 'test_*.py'
+      - name: Lint release shell scripts
+        run: shellcheck .github/scripts/release.sh .github/scripts/tests/release.sh
