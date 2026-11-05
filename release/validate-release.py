@@ -99,19 +99,40 @@ def policy_at(commit, path):
     return policy
 
 
+def changelog_section(text, version):
+    lines = text.splitlines()
+    headings = []
+    fence = None
+    for index, line in enumerate(lines):
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if marker:
+            run, tail = marker.groups()
+            if fence is None and (run[0] != "`" or "`" not in tail):
+                fence = run
+            elif fence and run[0] == fence[0] and len(run) >= len(fence) and not tail.strip():
+                fence = None
+            continue
+        if fence is None and line.startswith("## "):
+            headings.append((index, line))
+    matches = [index for index, line in headings
+               if re.fullmatch(r"## \[" + re.escape(version) + r"\](?:[^\S\n][^\n]*)?", line)]
+    if len(matches) != 1:
+        raise ValueError("exactly one versioned changelog section required")
+    end = next((index for index, _ in headings if index > matches[0]), len(lines))
+    body = "\n".join(lines[matches[0] + 1:end]).strip()
+    body = re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL).strip()
+    if not re.sub(r"^#{1,6}\s.*$", "", body, flags=re.MULTILINE).strip():
+        raise ValueError("versioned changelog section is empty")
+    return body
+
+
 def check_current(commit, policy):
     version = version_at(commit, policy["version"])
     for mirror in policy["mirrors"]:
         if version_at(commit, mirror) != version:
             raise ValueError("version mirror mismatch")
     changelog = read_file(commit, policy["changelog"])
-    sections = list(re.finditer(r"^## \[" + re.escape(version) + r"\](?:[^\S\n][^\n]*)?$", changelog, re.MULTILINE))
-    if len(sections) != 1:
-        raise ValueError("exactly one versioned changelog section required")
-    body = re.split(r"^## ", changelog[sections[0].end():], maxsplit=1, flags=re.MULTILINE)[0]
-    body = re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL)
-    if not any(line.strip() and not line.lstrip().startswith("#") for line in body.splitlines()):
-        raise ValueError("versioned changelog section is empty")
+    changelog_section(changelog, version)
     git("check-ref-format", f"refs/tags/{policy['tag_prefix']}{version}")
     return version
 
