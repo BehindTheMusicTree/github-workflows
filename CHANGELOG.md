@@ -54,6 +54,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Added
 
+- Verify existing npm artifacts by name, version and archive integrity when resuming partial multi-package publications.
 - Share GitHub-only release publication with tag provenance, changelog notes and fail-closed retries; package publishers can extract validated notes without moving their OIDC jobs.
 
 ### Added

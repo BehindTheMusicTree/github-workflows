@@ -431,3 +431,13 @@ from its own checkout to validate provenance and extract notes before publishing
 Its existing GitHub Release owner publishes those notes after every required artifact
 succeeds. The standalone publisher refuses policies listing packages so it cannot bypass
 that ordering. Neither entry point receives the release App key.
+
+For npm recovery, invoke `node PATH/TO/foundation/release/npm-artifact.cjs PACKAGE VERSION
+ARCHIVE` in a step with an `id`, then publish only when `steps.ID.outputs.exists != 'true'`.
+The helper uses npmjs.org, requires stable SemVer, and accepts an existing artifact only
+when its name, version and SHA-512 archive integrity match. Every HTTP error except 404,
+invalid JSON and network failures stop the job. Run this separately for each package in
+publication order, then create the GitHub Release only after all packages succeed. A
+changed build environment or non-reproducible archive may require investigation; an
+existing version alone is never treated as success. Keep this check in the existing
+publisher job and retain its npm OIDC configuration and runtime.
