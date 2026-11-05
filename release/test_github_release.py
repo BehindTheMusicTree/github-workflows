@@ -59,6 +59,14 @@ class PublishReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             module.release_notes('## [2.3.0]\nA', 'v2.3.0-rc.1')
 
+    def test_fenced_headings_preserve_complete_release_notes(self):
+        for fence in ('```md', '~~~markdown', '````md'):
+            close = fence.split('m')[0]
+            notes = '- Example syntax:\n\n' + fence + '\n## Example\n## [2.3.0]\n' + close + '\n\n- Other fix.'
+            text = '```md\n## [2.3.0]\n- Example version\n```\n\n## [2.3.0]\n\n' + notes + '\n\n## [2.2.0]\n- Old'
+            with self.subTest(fence=fence):
+                self.assertEqual(module.release_notes(text, TAG), notes)
+
     def test_create_then_retry_without_duplicate(self):
         api = FakeAPI([module.APIError(404), RELEASE])
         self.assertEqual(module.publish(api, TAG, COMMIT, 'Notes'), 'created')

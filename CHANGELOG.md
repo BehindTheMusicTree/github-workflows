@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### Fixed
+
+- Release validation and publication preserve complete changelog notes containing fenced Markdown headings and ignore fenced version examples.
+
 ### Changed
 
 - Adopt CI-owned tags and changelog-based GitHub publication for this repository, preserving script-based release preparation.

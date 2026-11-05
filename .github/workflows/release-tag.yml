@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: BehindTheMusicTree/github-workflows
-          ref: f304059fd7e9a9d0743a9e6a76ae11ea6e12f121
+          ref: bbd93e5c3ba2335515b35e1a163f305db51478d7
           persist-credentials: false
           path: foundation
       - name: Validate the exact push
@@ -68,7 +68,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: BehindTheMusicTree/github-workflows
-          ref: f304059fd7e9a9d0743a9e6a76ae11ea6e12f121
+          ref: bbd93e5c3ba2335515b35e1a163f305db51478d7
           persist-credentials: false
       - name: Require App configuration
         env:

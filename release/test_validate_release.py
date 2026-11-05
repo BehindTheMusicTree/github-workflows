@@ -52,6 +52,10 @@ class ReleaseValidationTest(unittest.TestCase):
         finally:
             os.chdir(previous)
 
+    def test_validation_ignores_fenced_example_versions(self):
+        self.write('CHANGELOG.md', '```md\n## [1.0.0]\n- Example\n```\n\n## [1.0.0]\n- Real\n```md\n## Example\n```\n- Last\n')
+        self.assertEqual(self.check(self.commit()), {'release': False})
+
     def test_no_bump_is_noop_even_without_tag(self):
         self.assertEqual(self.check(self.commit()), {'release': False})
 
