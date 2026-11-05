@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('publish_release', ROOT / 'release/github-release.py')
@@ -25,6 +26,30 @@ class FakeAPI:
 
 
 class PublishReleaseTests(unittest.TestCase):
+    def test_tag_context_requires_tag_commit_main_policy_and_mirrors(self):
+        policy = {'tag_prefix': 'v', 'changelog': 'CHANGELOG.md',
+                  'outputs': {'github_release': True, 'packages': []}}
+        calls = []
+        def git(*args):
+            calls.append(args)
+            if args[0] == 'rev-parse':
+                return COMMIT + '\n'
+            return ''
+        validation = {'git': git, 'policy_at': lambda *args: policy,
+                      'check_current': lambda *args: '2.3.0',
+                      'read_file': lambda *args: '## [2.3.0] - 2026-11-04\n\n- Notes\n'}
+        with patch.dict(module.VALIDATION, validation):
+            self.assertEqual(module.tag_context(TAG), (COMMIT, policy, '- Notes'))
+            self.assertIn(('merge-base', '--is-ancestor', COMMIT, 'refs/remotes/origin/main'), calls)
+            with self.assertRaises(ValueError):
+                module.tag_context('v2.4.0')
+            with patch.dict(module.VALIDATION, {'check_current': lambda *args: (_ for _ in ()).throw(ValueError('mirror mismatch'))}):
+                with self.assertRaises(ValueError):
+                    module.tag_context(TAG)
+            with patch.dict(module.VALIDATION, {'git': lambda *args: COMMIT if args == ('rev-parse', 'HEAD') else 'b' * 40}):
+                with self.assertRaises(ValueError):
+                    module.tag_context(TAG)
+
     def test_changelog(self):
         text = '## [Unreleased]\n\n- Next\n\n## [2.3.0] - 2026-11-04\n\n### Added\n- Feature\n\n## [2.2.0]\n- Old\n'
         self.assertEqual(module.release_notes(text, TAG), '### Added\n- Feature')
