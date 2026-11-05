@@ -43,12 +43,12 @@ class ReleaseValidationTest(unittest.TestCase):
         self.git('update-ref', 'refs/remotes/origin/main', sha)
         return sha
 
-    def check(self, after):
+    def check(self, after, policy_path='policy.json'):
         import os
         previous = os.getcwd()
         try:
             os.chdir(self.root)
-            return validator.validate(self.before, after, 'policy.json')
+            return validator.validate(self.before, after, policy_path)
         finally:
             os.chdir(previous)
 
@@ -182,6 +182,25 @@ class ReleaseValidationTest(unittest.TestCase):
             self.check(self.commit())
         self.write('second.json', '{"version":"1.1.0"}')
         self.assertTrue(self.check(self.commit())['release'])
+
+    def test_missing_policy_fails(self):
+        self.git('rm', 'policy.json')
+        with self.assertRaises(ValueError):
+            self.check(self.commit())
+
+    def test_nested_policy_detected_on_previous_commit(self):
+        (self.root / '.github').mkdir()
+        self.git('mv', 'policy.json', '.github/release-policy.json')
+        self.before = self.commit()
+        self.bump()
+        self.assertTrue(self.check(self.commit(), '.github/release-policy.json')['release'])
+
+    def test_unrelated_before_fails(self):
+        self.git('checkout', '-q', '--orphan', 'unrelated')
+        self.write('unrelated.txt', 'different root')
+        after = self.commit()
+        with self.assertRaises(ValueError):
+            self.check(after)
 
 
 if __name__ == '__main__':

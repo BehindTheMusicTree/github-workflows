@@ -1,0 +1,94 @@
+# Shared implementation is pinned separately so no caller code runs with App secrets.
+name: Validate and tag release
+
+on:
+  workflow_call:
+    inputs:
+      app-id:
+        description: Release GitHub App ID
+        type: string
+        required: true
+    secrets:
+      release-app-private-key:
+        required: true
+    outputs:
+      tag:
+        description: Release tag, empty for a push without release intent
+        value: ${{ jobs.validate.outputs.tag }}
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.intent.outputs.release }}
+      tag: ${{ steps.intent.outputs.tag }}
+      commit: ${{ steps.intent.outputs.commit }}
+    steps:
+      - name: Require a main push
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          DELETED: ${{ github.event.deleted }}
+        run: |
+          test "$EVENT" = push
+          test "$REF" = refs/heads/main
+          test "$DELETED" = false
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: caller
+      - uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/github-workflows
+          ref: f304059fd7e9a9d0743a9e6a76ae11ea6e12f121
+          persist-credentials: false
+          path: foundation
+      - name: Validate the exact push
+        id: intent
+        working-directory: caller
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          POLICY: .github/release-policy.json
+        run: |
+          python3 ../foundation/release/validate-release.py "$BEFORE" "$AFTER" "$POLICY" > "$RUNNER_TEMP/release-intent.json"
+          jq -r '"release=\(.release)", "tag=\(.tag // "")", "commit=\(.commit // "")"' "$RUNNER_TEMP/release-intent.json" >> "$GITHUB_OUTPUT"
+
+  tag:
+    needs: validate
+    if: needs.validate.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    # Each event is independent: a global concurrency group can drop pending bumps.
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/github-workflows
+          ref: f304059fd7e9a9d0743a9e6a76ae11ea6e12f121
+          persist-credentials: false
+      - name: Require App configuration
+        env:
+          APP_ID: ${{ inputs.app-id }}
+          APP_PRIVATE_KEY: ${{ secrets.release-app-private-key }}
+        run: |
+          test -n "$APP_ID" || { echo 'Release App ID missing' >&2; exit 1; }
+          test -n "$APP_PRIVATE_KEY" || { echo 'Release App private key missing' >&2; exit 1; }
+      - name: Create repository-scoped App token
+        id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ inputs.app-id }}
+          private-key: ${{ secrets.release-app-private-key }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - name: Create or verify immutable annotated tag
+        env:
+          RELEASE_APP_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          COMMIT: ${{ needs.validate.outputs.commit }}
+        run: python3 release/create-tag.py "$TAG" "$COMMIT"

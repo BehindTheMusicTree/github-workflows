@@ -54,7 +54,7 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Added
 
-- Draft release policy schema and example for explicitly declaring version sources and outputs.
+- Add a reusable release validator and atomic App-based annotated tagging workflow, with explicit version contracts, migration safeguards and retry tests.
 
 ## [5.0.1] - 2026-11-02
 
