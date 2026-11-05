@@ -17,7 +17,7 @@ This script:
   3) Creates a commit
   4) Leaves the commit on the current feature branch for a PR
 
-After that PR merges, run publish on updated main to tag and push the merged commit.
+After that PR merges, CI validates the merged commit, creates its tag and publishes the release.
 EOF
 }
 
@@ -216,4 +216,4 @@ git commit -m "chore(release): ${tag}"
 echo "Release prepared."
 echo "- Version: ${effective_version} -> ${version} (VERSION file before bump: ${current_version})"
 echo "- Commit created locally: chore(release): ${tag}"
-echo "- Open a PR to main, then run .github/scripts/release.sh publish on updated main."
+echo "- Open a PR to main; CI creates the tag and publishes the release after merge."

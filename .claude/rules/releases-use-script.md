@@ -10,6 +10,7 @@ When the user asks for a "new release" (or equivalent wording), always use `.git
 - If bump type is unclear, ask a single clarifying question before running the script.
 - Do not manually edit `CHANGELOG.md`, `VERSION`, create tags, or craft release commits as a substitute for the script.
 - Run the script as the source of truth for release preparation steps.
+- Open a PR against `main`; after merge, CI alone creates the tag and publishes the GitHub release. Do not run local `publish` when the release policy is present.
 
 Examples:
 - "new release" -> ask whether `major`, `minor`, or `patch`, then run `.github/scripts/release.sh <type>`.
