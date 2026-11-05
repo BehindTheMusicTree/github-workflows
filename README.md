@@ -414,3 +414,30 @@ Each run creates an annotated tag object, then atomically creates its ref. An ex
 `outputs` records the publisher contract; this tagger does not assert that those artifacts are published. For a partial publication, rerun the existing tag publisher after checking each required artifact. In a multi-package project the publisher must skip an already published identical version and distinguish registry errors from an absent package. GitHub Release creation must have one owner and wait for every required package. Do not replace a missing publisher run with an arbitrary workflow dispatch.
 
 Run `python3 -m unittest discover -s release -p 'test_*.py'`, `bash .github/scripts/tests/release.sh`, `shellcheck .github/scripts/release.sh .github/scripts/tests/release.sh`, and `actionlint`. Tests simulate tagging and API errors without credentials or remote writes. Python 3.11+ is required. Repository-specific publisher recovery and a live App run are adoption checks, beyond the local foundation tests.
+
+### GitHub-only publisher and package recovery
+
+Repositories whose policy declares `github_release: true` and an empty `packages` list can
+call `.github/workflows/release-github.yml` from their tag workflow. Pin the caller to a full
+merged SHA, grant `contents: write`, and keep repository-specific validation jobs before it
+with `needs`. The publisher checks the exact dereferenced tag, main ancestry, canonical
+version, mirrors and populated changelog, then uses the ordinary workflow token to create
+one stable GitHub Release. It never creates the release tag. API errors fail; only a 404
+means absent. A concurrent 422 is accepted only after reading a published stable release.
+
+A package publisher keeps its current workflow file and OIDC identity. After checking out
+this foundation at an immutable SHA, it can run `release/github-release.py notes OUTPUT`
+from its own checkout to validate provenance and extract notes before publishing packages.
+Its existing GitHub Release owner publishes those notes after every required artifact
+succeeds. The standalone publisher refuses policies listing packages so it cannot bypass
+that ordering. Neither entry point receives the release App key.
+
+For npm recovery, invoke `node PATH/TO/foundation/release/npm-artifact.cjs PACKAGE VERSION
+ARCHIVE` in a step with an `id`, then publish only when `steps.ID.outputs.exists != 'true'`.
+The helper uses npmjs.org, requires stable SemVer, and accepts an existing artifact only
+when its name, version and SHA-512 archive integrity match. Every HTTP error except 404,
+invalid JSON and network failures stop the job. Run this separately for each package in
+publication order, then create the GitHub Release only after all packages succeed. A
+changed build environment or non-reproducible archive may require investigation; an
+existing version alone is never treated as success. Keep this check in the existing
+publisher job and retain its npm OIDC configuration and runtime.

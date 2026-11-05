@@ -1,0 +1,38 @@
+name: Publish GitHub-only release
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a tag push
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          DELETED: ${{ github.event.deleted }}
+        run: |
+          test "$EVENT" = push
+          test "$REF_TYPE" = tag
+          test "$DELETED" = false
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: caller
+      - uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/github-workflows
+          ref: 8ae00ab34e74ffe16977cf28bdc93ecd6724ed6d
+          persist-credentials: false
+          path: foundation
+      - name: Validate and publish the existing tag
+        working-directory: caller
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 ../foundation/release/github-release.py publish
