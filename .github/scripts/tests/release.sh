@@ -32,3 +32,9 @@ if bash "$script" publish; then
   echo 'Publishing an existing tag should fail' >&2
   exit 1
 fi
+mkdir -p .github
+printf '{}\n' > .github/release-policy.json
+if bash "$script" publish; then
+  echo 'Manual publication with a CI policy should fail' >&2
+  exit 1
+fi

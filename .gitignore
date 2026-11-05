@@ -2,3 +2,4 @@
 .local/
 .github/pr-descriptions/
 .claude/worktrees/
+__pycache__/
