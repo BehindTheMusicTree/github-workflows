@@ -1,0 +1,8 @@
+paths:
+  # actionlint (<= 1.7.12) does not yet know the job.workflow_sha / job.workflow_repository properties.
+  .github/workflows/release-tag.yml:
+    ignore:
+      - 'property "workflow_(?:sha|repository)" is not defined in object type'
+  .github/workflows/release-github.yml:
+    ignore:
+      - 'property "workflow_(?:sha|repository)" is not defined in object type'

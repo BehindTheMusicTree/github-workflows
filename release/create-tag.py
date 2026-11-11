@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+import time
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -65,7 +66,33 @@ def existing_commit(api, tag):
     return obj["sha"]
 
 
-def create_tag(api, tag, commit):
+def points_to(obj, kind, sha):
+    # GitHub adds fields such as "url" to object; compare only the identity.
+    return isinstance(obj, dict) and obj.get("type") == kind and obj.get("sha") == sha
+
+
+def wait_for_commit(api, tag, commit, sleep=time.sleep, attempts=6):
+    # GitHub reads can lag right after a successful write: tolerate 404, never a mismatch.
+    delay = 1
+    for attempt in range(attempts):
+        try:
+            current = existing_commit(api, tag)
+        except APIError as exc:
+            # The tag object itself can lag behind the ref that points to it.
+            if exc.status != 404:
+                raise
+            current = None
+        if current is not None:
+            if current != commit:
+                raise ValueError("release tag collision: tag targets another commit")
+            return current
+        if attempt < attempts - 1:
+            sleep(delay)
+            delay = min(delay * 2, 8)
+    return None
+
+
+def create_tag(api, tag, commit, sleep=time.sleep):
     if not re.fullmatch(r"[A-Za-z0-9_-]+(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", tag):
         raise ValueError("invalid stable release tag")
     if not re.fullmatch(r"[0-9a-f]{40}", commit) or commit == "0" * 40:
@@ -81,20 +108,21 @@ def create_tag(api, tag, commit):
     sha = annotated["sha"]
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("invalid tag object SHA returned by GitHub")
+    if not points_to(annotated.get("object"), "commit", commit):
+        raise ValueError("annotated tag does not target the expected commit")
     try:
-        api.request("POST", "/git/refs", {"ref": "refs/tags/" + tag, "sha": sha})
+        created = api.request("POST", "/git/refs", {"ref": "refs/tags/" + tag, "sha": sha})
     except APIError as exc:
         # Another run may win the atomic ref creation. Only the same commit is a retry.
         if exc.status != 422:
             raise
-        current = existing_commit(api, tag)
-        if current is None:
+        if wait_for_commit(api, tag, commit, sleep) is None:
             raise exc
-        if current != commit:
-            raise ValueError("release tag collision: concurrent tag targets another commit") from None
         return "existing"
-    if existing_commit(api, tag) != commit:
-        raise ValueError("created tag did not resolve to the expected commit")
+    if created.get("ref") != "refs/tags/" + tag or not points_to(created.get("object"), "tag", sha):
+        raise ValueError("created ref does not match the annotated tag")
+    if wait_for_commit(api, tag, commit, sleep) is None:
+        raise ValueError("created tag not readable yet; rerun the job to verify")
     return "created"
 
 
