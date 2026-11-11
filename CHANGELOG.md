@@ -54,6 +54,9 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ### Fixed
 
+- Tag creation tolerates GitHub read-after-write lag: it validates the write responses and re-reads the tag with backoff instead of failing a correct tag; the tests simulate the lag.
+- Release workflows load their helper scripts from the caller-pinned workflow commit (`job.workflow_sha`) instead of a hard-coded pre-squash SHA, removing the two-step self-pin.
+
 - Preserve complete release notes when Markdown examples contain version headings.
 
 - Release validation and publication preserve complete changelog notes containing fenced Markdown headings and ignore fenced version examples.

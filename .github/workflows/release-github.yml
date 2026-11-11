@@ -10,6 +10,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Require the caller-pinned workflow commit
+        env:
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        run: |
+          [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Workflow commit SHA unavailable' >&2; exit 1; }
+          test "$WORKFLOW_REPOSITORY" = BehindTheMusicTree/github-workflows || { echo 'Unexpected workflow repository' >&2; exit 1; }
       - name: Require a tag push
         env:
           EVENT: ${{ github.event_name }}
@@ -28,7 +35,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: BehindTheMusicTree/github-workflows
-          ref: bbd93e5c3ba2335515b35e1a163f305db51478d7
+          ref: ${{ job.workflow_sha }}
           persist-credentials: false
           path: foundation
       - name: Validate and publish the existing tag
