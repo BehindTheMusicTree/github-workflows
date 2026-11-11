@@ -52,6 +52,8 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-11-11
+
 ### CI
 
 - Pin this repository's own release and publish callers to the merged lag-tolerant workflow commit.
