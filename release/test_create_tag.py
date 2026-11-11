@@ -22,6 +22,7 @@ class FakeGitHub:
         self.failure = None
         self.race = None
         self.lag = 0
+        self.tag_lag = 0
         self.bad_tag_object = None
         self.bad_ref_response = None
 
@@ -38,11 +39,14 @@ class FakeGitHub:
                 raise tagger.APIError(404)
             return {"object": self.refs[name]}
         if path.startswith("/git/tags/"):
+            if self.tag_lag:
+                self.tag_lag -= 1
+                raise tagger.APIError(404)
             return {"object": self.tags[path.removeprefix("/git/tags/")]}
         if path == "/git/tags":
             sha = f"{len(self.tags) + 1:040x}"
             self.tags[sha] = {"type": "commit", "sha": data["object"]}
-            return {"sha": sha, "object": self.bad_tag_object or self.tags[sha]}
+            return {"sha": sha, "object": self.bad_tag_object or {**self.tags[sha], "url": "https://api.github.com/x"}}
         if path == "/git/refs":
             name = data["ref"].removeprefix("refs/tags/")
             if self.race:
@@ -51,7 +55,7 @@ class FakeGitHub:
             self.refs[name] = {"type": "tag", "sha": data["sha"]}
             if self.bad_ref_response is not None:
                 return self.bad_ref_response
-            return {"ref": data["ref"], "object": self.refs[name]}
+            return {"ref": data["ref"], "object": {**self.refs[name], "url": "https://api.github.com/x"}}
         raise AssertionError((method, path, data))
 
 
@@ -131,6 +135,22 @@ class TagCreationTest(unittest.TestCase):
                 waits = []
                 self.assertEqual(tagger.create_tag(api, "v1.1.0", COMMIT, sleep=waits.append), "created")
                 self.assertEqual(waits, [1, 2, 4, 8, 8][:lag])
+
+    def test_tag_object_read_lag_is_tolerated(self):
+        api = FakeGitHub()
+        original = api.request
+
+        def request(method, path, data=None):
+            if path == "/git/refs":
+                result = original(method, path, data)
+                api.tag_lag = 2
+                return result
+            return original(method, path, data)
+
+        api.request = request
+        waits = []
+        self.assertEqual(tagger.create_tag(api, "v1.1.0", COMMIT, sleep=waits.append), "created")
+        self.assertEqual(waits, [1, 2])
 
     def test_read_lag_beyond_attempts_fails_with_rerun_hint(self):
         api = FakeGitHub()

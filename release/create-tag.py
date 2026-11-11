@@ -66,11 +66,22 @@ def existing_commit(api, tag):
     return obj["sha"]
 
 
+def points_to(obj, kind, sha):
+    # GitHub adds fields such as "url" to object; compare only the identity.
+    return isinstance(obj, dict) and obj.get("type") == kind and obj.get("sha") == sha
+
+
 def wait_for_commit(api, tag, commit, sleep=time.sleep, attempts=6):
     # GitHub reads can lag right after a successful write: tolerate 404, never a mismatch.
     delay = 1
     for attempt in range(attempts):
-        current = existing_commit(api, tag)
+        try:
+            current = existing_commit(api, tag)
+        except APIError as exc:
+            # The tag object itself can lag behind the ref that points to it.
+            if exc.status != 404:
+                raise
+            current = None
         if current is not None:
             if current != commit:
                 raise ValueError("release tag collision: tag targets another commit")
@@ -97,7 +108,7 @@ def create_tag(api, tag, commit, sleep=time.sleep):
     sha = annotated["sha"]
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("invalid tag object SHA returned by GitHub")
-    if annotated.get("object") != {"type": "commit", "sha": commit}:
+    if not points_to(annotated.get("object"), "commit", commit):
         raise ValueError("annotated tag does not target the expected commit")
     try:
         created = api.request("POST", "/git/refs", {"ref": "refs/tags/" + tag, "sha": sha})
@@ -108,7 +119,7 @@ def create_tag(api, tag, commit, sleep=time.sleep):
         if wait_for_commit(api, tag, commit, sleep) is None:
             raise exc
         return "existing"
-    if created.get("ref") != "refs/tags/" + tag or created.get("object") != {"type": "tag", "sha": sha}:
+    if created.get("ref") != "refs/tags/" + tag or not points_to(created.get("object"), "tag", sha):
         raise ValueError("created ref does not match the annotated tag")
     if wait_for_commit(api, tag, commit, sleep) is None:
         raise ValueError("created tag not readable yet; rerun the job to verify")
