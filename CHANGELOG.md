@@ -52,6 +52,10 @@ All contributors (including maintainers) should update `CHANGELOG.md` when creat
 
 ## [Unreleased]
 
+### CI
+
+- Pin this repository's own release and publish callers to the merged lag-tolerant workflow commit.
+
 ### Fixed
 
 - Tag creation tolerates GitHub read-after-write lag: it validates the write responses and re-reads the tag with backoff instead of failing a correct tag; the tests simulate the lag.
