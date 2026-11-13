@@ -166,7 +166,7 @@ Before submitting a Pull Request:
 **2. Documentation**
 
 - [README.md](README.md) updated if you changed behavior or setup
-- [CHANGELOG.md](CHANGELOG.md) updated: add your changes under the `[Unreleased]` section (see [Changelog Best Practices](CHANGELOG.md#changelog-best-practices))
+- [CHANGELOG.md](CHANGELOG.md) updated: add your changes under the `[Unreleased]` section
 
 **3. Git**
 

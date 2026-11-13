@@ -5,52 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Changelog Best Practices
-
-### General Principles
-
-- Changelogs are for humans, not machines.
-- Include an entry for every version, with the latest first.
-- Group similar changes under: Added, Changed, Improved, Deprecated, Removed, Fixed, Documentation, Performance, CI.
-- **"Test" is NOT a valid changelog category** - tests should be mentioned within the related feature or fix entry, not as standalone entries.
-- Use an "Unreleased" section for upcoming changes.
-- Follow Semantic Versioning where possible.
-- Use ISO 8601 date format: YYYY-MM-DD.
-- Avoid dumping raw git logs; summarize notable changes clearly.
-
-### Guidelines for Contributors
-
-All contributors (including maintainers) should update `CHANGELOG.md` when creating PRs:
-
-1. **Add entries to the `[Unreleased]` section** - Add your changes under the appropriate category (Added, Changed, Improved, Deprecated, Removed, Fixed, Documentation, Performance, CI)
-2. **Follow the changelog format** - See examples below for structure and style
-3. **Group related changes** - Similar changes should be grouped together
-4. **Be descriptive** - Write clear, user-focused descriptions of what changed
-5. **Mention tests when relevant** - Tests should be mentioned within the related feature or fix entry, not as standalone entries
-6. **Category order** - Use this order in each version section: Added, Changed, Improved, Deprecated, Removed, Fixed, Documentation, Performance, CI (omit empty)
-
-**Example:**
-
-```markdown
-### Added
-
-- **Redeployment Webhook**: Added support for prod environment
-  - New environment input validation and webhook URL construction
-
-### Fixed
-
-- **Configuration Check**: Fixed script handling of empty variable values
-  - Script now properly detects unset variables vs empty strings
-
-### CI
-
-- **Workflow**: Added workflow_dispatch trigger for manual testing
-  - Allows manual testing of webhook calls from GitHub Actions UI
-```
-
-**Note:** During releases, maintainers will move entries from `[Unreleased]` to a versioned section (e.g., `## [0.2.0] - 2025-02-XX`).
-
 ## [Unreleased]
+
+### Documentation
+
+- Removed the contributor guidelines and example entry from `CHANGELOG.md`: the example duplicated the `[Unreleased]` heading and led agents to write entries in the wrong place, and the conventions now live in the shared `create-pr` skill.
 
 ## [5.1.0] - 2026-11-11
 
