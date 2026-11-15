@@ -1,0 +1,101 @@
+name: Prepare Python publication
+
+on:
+  workflow_call:
+    inputs:
+      package-name:
+        description: PyPI project name declared in the caller's release policy packages
+        required: true
+        type: string
+      python-version:
+        description: Python version used to build the wheel and sdist
+        default: '3.12'
+        type: string
+      artifact-name:
+        description: Artifact containing the wheel, sdist and SHA-256 manifest
+        default: python-distributions
+        type: string
+    outputs:
+      version:
+        description: Validated stable release version
+        value: ${{ jobs.build.outputs.version }}
+      artifact-name:
+        description: Artifact to download in the caller's Trusted Publishing job
+        value: ${{ inputs.artifact-name }}
+      foundation-sha:
+        description: Exact foundation commit to use for retry verification
+        value: ${{ jobs.build.outputs.foundation-sha }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      foundation-sha: ${{ steps.foundation.outputs.sha }}
+    steps:
+      - name: Require the caller-pinned workflow commit
+        id: foundation
+        env:
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        run: |
+          [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Workflow commit SHA unavailable' >&2; exit 1; }
+          test "$WORKFLOW_REPOSITORY" = BehindTheMusicTree/github-workflows
+          echo "sha=$WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
+      - name: Require a tag push
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          DELETED: ${{ github.event.deleted }}
+        run: |
+          test "$EVENT" = push
+          test "$REF_TYPE" = tag
+          test "$DELETED" = false
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: caller
+      - uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/github-workflows
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+          path: foundation
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Validate tag provenance and publication contract
+        id: release
+        working-directory: caller
+        env:
+          PACKAGE: ${{ inputs.package-name }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import runpy
+          from pathlib import Path
+          helper = runpy.run_path('../foundation/release/python-artifact.py')
+          version = helper['source_version'](os.environ['PACKAGE'], os.environ['GITHUB_REF_NAME'])
+          with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
+              output.write(f'version={version}\n')
+          PY
+      - name: Build and check wheel and sdist
+        working-directory: caller
+        env:
+          PACKAGE: ${{ inputs.package-name }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python3 -m pip install build twine
+          python3 -m build --outdir "$RUNNER_TEMP/python-dist"
+          python3 -m twine check --strict "$RUNNER_TEMP/python-dist/"*
+          python3 ../foundation/release/python-artifact.py manifest "$PACKAGE" "$VERSION" "$RUNNER_TEMP/python-dist"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/python-dist/
+          if-no-files-found: error
