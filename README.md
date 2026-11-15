@@ -41,15 +41,19 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 ### Python publication
 
 [`publish-python.yml`](.github/workflows/publish-python.yml) builds exactly one wheel and
-one `.tar.gz` sdist from the caller's repository root, checks their metadata, and uploads
+one `.tar.gz` sdist from the caller's selected package directory (the repository root by
+default), checks their metadata, and uploads
 them with a SHA-256 manifest. It requires a tag push whose dereferenced commit is on
-`origin/main`, a valid `.github/release-policy.json`, matching canonical version/mirrors,
+`origin/main`, a valid selected release policy (default `.github/release-policy.json`),
+matching canonical version/mirrors,
 and populated release notes. Put the exact `package-name` in the policy's
 `outputs.packages` array. Only stable `X.Y.Z` versions are supported.
 
 | Input | Required | Default | Purpose |
 | --- | --- | --- | --- |
 | `package-name` | Yes | — | Intended PyPI project name; must match distribution metadata and filenames |
+| `package-directory` | No | `.` | Existing repository-relative build directory; symlinks and traversal are rejected |
+| `release-policy-path` | No | `.github/release-policy.json` | Repository-relative policy file; paths inside the policy are also relative to the repository root |
 | `python-version` | No | `3.12` | Build interpreter, Python 3.11+ required |
 | `artifact-name` | No | `python-distributions` | Artifact name, unique per package in a run |
 
@@ -137,10 +141,95 @@ upload. For multiple packages, use distinct artifact names and a separate caller
 each upload. Keep a single GitHub Release owner that depends on all publication jobs;
 this workflow never creates a tag or GitHub Release.
 
-The helper is standard-library-only; run its tests with
+The helper is standard-library-only. Its tests also build fixture packages: install
+`build twine setuptools wheel`, then run
 `python3 -m unittest discover -s release -p 'test_python_artifact.py'`. The existing release
 foundation CI job includes them automatically. Adoption still needs a live caller test
 against its configured PyPI Trusted Publisher; local tests never perform uploads.
+
+#### Two independently versioned packages
+
+For `packages/alpha` at `2.3.4` and `packages/beta` at `7.0.1`, use separate policies
+and tag prefixes. For example, `.github/alpha-release.json` contains:
+
+```json
+{
+  "release_branch": "main",
+  "version": {"path": "packages/alpha/pyproject.toml", "format": "toml", "key": "project.version"},
+  "mirrors": [],
+  "tag_prefix": "alpha-v",
+  "changelog": "packages/alpha/CHANGELOG.md",
+  "outputs": {"github_release": true, "packages": ["alpha-pkg"]}
+}
+```
+
+Create `.github/beta-release.json` with `beta` paths, `beta-v`, and `beta-pkg`.
+Each changelog must have nonempty notes for its own version. Keep all policy paths
+relative to the repository root, including when the policy file lives inside a package.
+The policies need not share a version source, mirrors, changelog or tag prefix.
+Distribution filenames and embedded metadata must match the selected policy version
+and `package-name`; building the wrong package fails before any upload.
+
+In the **same caller workflow file** as the Trusted Publishing job above, replace
+its tag filter and build job with the following selection and build jobs:
+
+```yaml
+on:
+  push:
+    tags: ['alpha-v*', 'beta-v*']
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.package.outputs.package }}
+      directory: ${{ steps.package.outputs.directory }}
+      policy: ${{ steps.package.outputs.policy }}
+      artifact: ${{ steps.package.outputs.artifact }}
+    steps:
+      - id: package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          case "$TAG" in
+            alpha-v*) package=alpha ;;
+            beta-v*) package=beta ;;
+            *) echo 'Unexpected package tag' >&2; exit 1 ;;
+          esac
+          {
+            echo "package=$package-pkg"
+            echo "directory=packages/$package"
+            echo "policy=.github/$package-release.json"
+            echo "artifact=$package-distributions"
+          } >> "$GITHUB_OUTPUT"
+  build:
+    needs: select
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/publish-python.yml@REPLACE_WITH_MERGED_SHA
+    with:
+      package-name: ${{ needs.select.outputs.package }}
+      package-directory: ${{ needs.select.outputs.directory }}
+      release-policy-path: ${{ needs.select.outputs.policy }}
+      artifact-name: ${{ needs.select.outputs.artifact }}
+```
+
+Keep the caller's `publish` job, changing its `needs` to `[select, build]`. Use
+`https://pypi.org/p/${{ needs.select.outputs.package }}` for its environment URL, set
+`PACKAGE: ${{ needs.select.outputs.package }}` in the retry and final verification
+steps' environments, and replace the literal `example-pkg` in those commands with
+`"$PACKAGE"`. The artifact, version and foundation SHA still come from `needs.build.outputs`.
+Register **both** PyPI projects with this caller workflow filename and environment.
+An `alpha-v2.3.4` push validates/builds/publishes only alpha; `beta-v7.0.1` publishes
+only beta, even when both tags point to the same commit. A failed beta publication
+can be retried without changing alpha's version or tag.
+
+GitHub Release creation stays in the caller and has one owner per tag. Add its job
+**after** publication with `needs: [select, build, publish]`, using the default success
+condition. It must validate the selected policy and use that policy's versioned
+changelog section. If a tag requires additional publications (for example another
+registry), include **every** publication job in `needs` and create the GitHub Release
+only when all succeed, including final registry verification. Do not use `always()`
+to publish a release after a failure, or race an independent tag-triggered GitHub Release
+workflow against the upload jobs. The standalone `release-github.yml` is for GitHub-only
+root policies and refuses package outputs; retain the caller's package release owner.
 
 ### Agent drift
 

@@ -2,6 +2,9 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 import tarfile
 import tempfile
@@ -146,6 +149,7 @@ class SourceVersionTests(unittest.TestCase):
         self.commit = 'a' * 40
         self.policy = {'tag_prefix': 'v', 'outputs': {'packages': ['example-pkg']}}
         self.validation = {
+            'repository_path': module.runpy.run_path(str(Path(__file__).with_name('validate-release.py')))['repository_path'],
             'git': Mock(side_effect=[self.commit, self.commit, '']),
             'policy_at': Mock(return_value=self.policy),
             'check_current': Mock(return_value='1.2.3'),
@@ -177,6 +181,137 @@ class SourceVersionTests(unittest.TestCase):
         self.validation['check_current'].side_effect = ValueError('mirror mismatch')
         with self.assertRaisesRegex(ValueError, 'mirror mismatch'):
             module.source_version('example-pkg', 'v1.2.3', self.validation)
+
+
+class RepositorySourceTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.git('init', '-q', '-b', 'main')
+        self.git('config', 'user.name', 'Test')
+        self.git('config', 'user.email', 'test@example.com')
+        self.add_package('.', 'root-pkg', '1.0.0', 'v', '.github/release-policy.json')
+        self.add_package('packages/alpha', 'alpha-pkg', '2.3.4', 'alpha-v', '.github/alpha.json')
+        self.add_package('packages/beta', 'beta-pkg', '7.0.1', 'beta-v', '.github/beta.json')
+        self.commit()
+        for tag in ('v1.0.0', 'alpha-v2.3.4', 'beta-v7.0.1'):
+            self.git('tag', '-a', tag, '-m', tag)
+        previous = Path.cwd()
+        os.chdir(self.root)
+        self.addCleanup(os.chdir, previous)
+
+    def git(self, *args):
+        return subprocess.check_output(['git', *args], cwd=self.root, text=True).strip()
+
+    def write(self, path, text):
+        target = self.root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text)
+
+    def add_package(self, directory, name, version, prefix, policy_path):
+        base = '' if directory == '.' else directory + '/'
+        self.write(base + 'VERSION', version)
+        self.write(base + 'pyproject.toml', (
+            '[build-system]\nrequires = ["setuptools", "wheel"]\nbuild-backend = "setuptools.build_meta"\n'
+            f'[project]\nname = "{name}"\nversion = "{version}"\n'
+            'description = "Fixture"\nreadme = "README.md"\n'
+            '[tool.setuptools]\npy-modules = ["sample"]\n'))
+        self.write(base + 'sample.py', 'VALUE = 1\n')
+        self.write(base + 'README.md', 'Fixture package.\n')
+        self.write(base + 'CHANGELOG.md', f'## [{version}]\n\n- Release {name}.\n')
+        policy = {
+            'release_branch': 'main', 'version': {'path': base + 'VERSION', 'format': 'text'},
+            'mirrors': [{'path': base + 'pyproject.toml', 'format': 'toml', 'key': 'project.version'}],
+            'tag_prefix': prefix, 'changelog': base + 'CHANGELOG.md',
+            'outputs': {'github_release': True, 'packages': [name]},
+        }
+        self.write(policy_path, json.dumps(policy))
+
+    def commit(self):
+        self.git('add', '.')
+        self.git('commit', '-qm', 'fixture')
+        self.git('update-ref', 'refs/remotes/origin/main', 'HEAD')
+
+    def source(self, name='alpha-pkg', tag='alpha-v2.3.4', directory='packages/alpha', policy='.github/alpha.json'):
+        return module.source_version(name, tag, package_directory_path=directory, release_policy_path=policy)
+
+    def test_root_defaults_are_compatible(self):
+        self.assertEqual(module.source_version('root-pkg', 'v1.0.0'), '1.0.0')
+
+    def test_nested_packages_use_independent_versions_policies_and_notes(self):
+        self.assertEqual(self.source(), '2.3.4')
+        self.assertEqual(self.source('beta-pkg', 'beta-v7.0.1', 'packages/beta', '.github/beta.json'), '7.0.1')
+
+    def test_builds_root_and_nested_distributions_with_independent_versions(self):
+        for directory, package, tag, policy in (
+                ('.', 'root-pkg', 'v1.0.0', '.github/release-policy.json'),
+                ('packages/alpha', 'alpha-pkg', 'alpha-v2.3.4', '.github/alpha.json'),
+                ('packages/beta', 'beta-pkg', 'beta-v7.0.1', '.github/beta.json')):
+            with self.subTest(package=package):
+                version = self.source(package, tag, directory, policy)
+                destination = self.root / 'built' / package
+                result = subprocess.run(
+                    [sys.executable, '-m', 'build', '--no-isolation', directory, '--outdir', str(destination)],
+                    capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                result = subprocess.run(
+                    [sys.executable, '-m', 'twine', 'check', '--strict',
+                     *map(str, destination.iterdir())], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                manifest = module.distributions(package, version, destination)
+                self.assertEqual(manifest['version'], version)
+                self.assertEqual(len(manifest['files']), 2)
+
+    def test_wrong_policy_package_or_tag_fails(self):
+        for changes in ({'policy': '.github/beta.json'}, {'name': 'beta-pkg'}, {'tag': 'beta-v7.0.1'}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                self.source(**changes)
+
+    def test_invalid_directory_or_policy_path_fails_before_git(self):
+        for directory in ('', '..', '../escape', '/tmp', '-option', 'packages/../alpha',
+                          'packages//alpha', './packages/alpha', 'packages\\alpha',
+                          'missing', 'packages/alpha/VERSION', 'packages/alpha\n'):
+            with self.subTest(directory=directory), self.assertRaises(ValueError):
+                self.source(directory=directory)
+        for policy in ('', '.', '../policy.json', '/tmp/policy.json', '-policy',
+                       '.github//alpha.json', '.github/../alpha.json', '.github/alpha.json\n',
+                       '.github/missing.json'):
+            with self.subTest(policy=policy), self.assertRaises(ValueError):
+                self.source(policy=policy)
+
+    def test_directory_symlinks_inside_or_outside_repository_fail(self):
+        (self.root / 'alias').symlink_to(self.root / 'packages', target_is_directory=True)
+        (self.root / 'outside').symlink_to(self.root.parent, target_is_directory=True)
+        for directory in ('alias/alpha', 'outside'):
+            with self.subTest(directory=directory), self.assertRaises(ValueError):
+                self.source(directory=directory)
+
+    def test_invalid_package_policy_version_and_notes_fail(self):
+        policy = (self.root / '.github/alpha.json').read_text()
+        cases = [('.github/alpha.json', '{}'), ('packages/alpha/VERSION', '2.3.4rc1'),
+                 ('packages/alpha/pyproject.toml', '[project]\nversion = "9.9.9"\n'),
+                 ('packages/alpha/CHANGELOG.md', '## [2.3.4]\n\n### Added\n')]
+        for path, text in cases:
+            original = (self.root / path).read_text()
+            self.write(path, text)
+            self.commit()
+            self.git('tag', '-f', 'alpha-v2.3.4')
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                self.source()
+            self.write(path, original)
+        self.assertEqual((self.root / '.github/alpha.json').read_text(), policy)
+
+    def test_tag_commit_and_main_ancestry_still_required_for_nested_package(self):
+        tagged = self.git('rev-parse', 'HEAD')
+        self.write('unrelated', 'new commit')
+        self.commit()
+        with self.assertRaisesRegex(ValueError, 'tag commit'):
+            self.source()
+        self.git('tag', '-f', 'alpha-v2.3.4')
+        self.git('update-ref', 'refs/remotes/origin/main', tagged)
+        with self.assertRaisesRegex(ValueError, 'merge-base'):
+            self.source()
 
 
 if __name__ == '__main__':

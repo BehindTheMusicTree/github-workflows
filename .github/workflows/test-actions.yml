@@ -56,6 +56,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v5
+      - name: Install Python artifact test tools
+        run: python3 -m pip install build twine setuptools wheel
       - name: Verify validation, collisions and retries without remote writes
         run: python3 -m unittest discover -s release -p 'test_*.py'
       - name: Verify npm partial-publication recovery with a simulated registry

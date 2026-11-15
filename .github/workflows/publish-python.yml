@@ -7,6 +7,14 @@ on:
         description: PyPI project name declared in the caller's release policy packages
         required: true
         type: string
+      package-directory:
+        description: Repository-relative package directory to build (no symlinks)
+        default: '.'
+        type: string
+      release-policy-path:
+        description: Repository-relative release policy; paths inside it remain repository-relative
+        default: .github/release-policy.json
+        type: string
       python-version:
         description: Python version used to build the wheel and sdist
         default: '3.12'
@@ -74,13 +82,18 @@ jobs:
         working-directory: caller
         env:
           PACKAGE: ${{ inputs.package-name }}
+          PACKAGE_DIRECTORY: ${{ inputs.package-directory }}
+          RELEASE_POLICY_PATH: ${{ inputs.release-policy-path }}
         run: |
           python3 - <<'PY'
           import os
           import runpy
           from pathlib import Path
           helper = runpy.run_path('../foundation/release/python-artifact.py')
-          version = helper['source_version'](os.environ['PACKAGE'], os.environ['GITHUB_REF_NAME'])
+          version = helper['source_version'](
+              os.environ['PACKAGE'], os.environ['GITHUB_REF_NAME'],
+              package_directory_path=os.environ['PACKAGE_DIRECTORY'],
+              release_policy_path=os.environ['RELEASE_POLICY_PATH'])
           with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
               output.write(f'version={version}\n')
           PY
@@ -89,9 +102,10 @@ jobs:
         env:
           PACKAGE: ${{ inputs.package-name }}
           VERSION: ${{ steps.release.outputs.version }}
+          PACKAGE_DIRECTORY: ${{ inputs.package-directory }}
         run: |
           python3 -m pip install build twine
-          python3 -m build --outdir "$RUNNER_TEMP/python-dist"
+          python3 -m build "$PACKAGE_DIRECTORY" --outdir "$RUNNER_TEMP/python-dist"
           python3 -m twine check --strict "$RUNNER_TEMP/python-dist/"*
           python3 ../foundation/release/python-artifact.py manifest "$PACKAGE" "$VERSION" "$RUNNER_TEMP/python-dist"
       - uses: actions/upload-artifact@v4
