@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Prepare wheel/sdist publication with a reusable Python workflow, caller-owned PyPI Trusted Publishing, and filename/SHA-256 verified retries including partial uploads.
+
 ### Documentation
 
 - Removed the contributor guidelines and example entry from `CHANGELOG.md`: the example duplicated the `[Unreleased]` heading and led agents to write entries in the wrong place, and the conventions now live in the shared `create-pr` skill.

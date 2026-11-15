@@ -11,6 +11,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - [Available Workflows](#available-workflows)
   - [Agent drift](#agent-drift)
   - [Actionlint](#actionlint)
+  - [Python publication](#python-publication)
   - [Call Redeployment Webhook](#call-redeployment-webhook)
   - [Set Image Tags On Server](#set-image-tags-on-server)
   - [Sync env to server](#sync-env-to-server)
@@ -36,6 +37,110 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - [License](#license)
 
 ## Available Workflows
+
+### Python publication
+
+[`publish-python.yml`](.github/workflows/publish-python.yml) builds exactly one wheel and
+one `.tar.gz` sdist from the caller's repository root, checks their metadata, and uploads
+them with a SHA-256 manifest. It requires a tag push whose dereferenced commit is on
+`origin/main`, a valid `.github/release-policy.json`, matching canonical version/mirrors,
+and populated release notes. Put the exact `package-name` in the policy's
+`outputs.packages` array. Only stable `X.Y.Z` versions are supported.
+
+| Input | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `package-name` | Yes | — | Intended PyPI project name; must match distribution metadata and filenames |
+| `python-version` | No | `3.12` | Build interpreter, Python 3.11+ required |
+| `artifact-name` | No | `python-distributions` | Artifact name, unique per package in a run |
+
+Outputs are `version`, `artifact-name`, and `foundation-sha` (the exact helper commit).
+No API token or release App key is used. The build job has only `contents: read`.
+
+PyPI Trusted Publishing must run in the caller's top-level workflow, outside the reusable
+workflow ([PyPA limitation](https://github.com/pypa/gh-action-pypi-publish#trusted-publishing)).
+Configure the caller repository, its existing workflow filename, and the `pypi` environment
+as the [PyPI Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/).
+Keep that workflow filename when adopting this helper so its OIDC identity is retained.
+Grant `id-token: write` only to the publication job. Add this to that caller workflow,
+replacing `REPLACE_WITH_MERGED_SHA` with the full merged foundation commit and
+`example-pkg` with your project:
+
+```yaml
+name: Publish Python
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: publish-python-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/publish-python.yml@REPLACE_WITH_MERGED_SHA
+    with:
+      package-name: example-pkg
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/example-pkg
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/github-workflows
+          ref: ${{ needs.build.outputs.foundation-sha }}
+          path: foundation
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: dist
+      - name: Verify downloaded files and check PyPI retries
+        id: retry
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: python3 foundation/release/python-artifact.py prepare example-pkg "$VERSION" dist pending
+      - name: Publish missing distributions with Trusted Publishing
+        if: steps.retry.outputs.upload-needed == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pending/
+          skip-existing: false
+      - name: Verify the complete published file set
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: python3 foundation/release/python-artifact.py verify example-pkg "$VERSION" dist
+```
+
+The retry helper queries the [PyPI version JSON API](https://docs.pypi.org/api/json/).
+It compares every remote filename and SHA-256 digest against the intended wheel/sdist.
+Identical complete releases skip uploading; partial releases stage only missing files.
+Unexpected files, changed hashes, yanked files, malformed responses and network/API
+errors fail; only HTTP 404 means absence. All existing files are checked before any
+file is staged. `pending` must not already exist. The manifest check separately verifies
+downloaded artifacts before querying PyPI. The final check requires the complete matching
+release; registry visibility delays may fail it safely and require a rerun.
+
+Rerun only the failed publication job to reuse the original build artifact. Rebuilding
+must reproduce its bytes: timestamps or changed build dependencies may otherwise cause
+a digest mismatch, which requires investigation. Do not enable blind `skip-existing` or
+move the tag. Concurrent upload collisions fail safely; retry after checking the winning
+upload. For multiple packages, use distinct artifact names and a separate caller job for
+each upload. Keep a single GitHub Release owner that depends on all publication jobs;
+this workflow never creates a tag or GitHub Release.
+
+The helper is standard-library-only; run its tests with
+`python3 -m unittest discover -s release -p 'test_python_artifact.py'`. The existing release
+foundation CI job includes them automatically. Adoption still needs a live caller test
+against its configured PyPI Trusted Publisher; local tests never perform uploads.
 
 ### Agent drift
 
