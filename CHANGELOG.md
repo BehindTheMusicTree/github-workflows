@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-11-15
+
+
 ### Added
 
 - Prepare wheel/sdist publication with a reusable Python workflow, caller-owned PyPI Trusted Publishing, and filename/SHA-256 verified retries including partial uploads.
