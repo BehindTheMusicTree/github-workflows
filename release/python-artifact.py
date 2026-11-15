@@ -19,16 +19,33 @@ from urllib.request import urlopen
 import zipfile
 
 
-def source_version(package, tag, validation=None):
+def package_directory(directory, validation):
+    if directory != '.':
+        validation['repository_path'](directory)
+    root = Path.cwd().resolve()
+    path = root / directory
+    if not path.resolve().is_relative_to(root) or not path.is_dir():
+        raise ValueError('Package directory must be an existing directory inside the repository')
+    for part in path.relative_to(root).parts:
+        root = root / part
+        if root.is_symlink():
+            raise ValueError('Package directory must not traverse symlinks')
+    return path
+
+
+def source_version(package, tag, validation=None, package_directory_path='.',
+                   release_policy_path='.github/release-policy.json'):
     canonical_name(package)
     if validation is None:
         validation = runpy.run_path(str(Path(__file__).with_name('validate-release.py')))
+    package_directory(package_directory_path, validation)
+    validation['repository_path'](release_policy_path)
     git = validation['git']
     commit = git('rev-parse', 'HEAD').strip()
     if git('rev-parse', f'refs/tags/{tag}^{{commit}}').strip() != commit:
         raise ValueError('Checkout differs from the tag commit')
     git('merge-base', '--is-ancestor', commit, 'refs/remotes/origin/main')
-    policy = validation['policy_at'](commit, '.github/release-policy.json')
+    policy = validation['policy_at'](commit, release_policy_path)
     version = validation['check_current'](commit, policy)
     if tag != policy['tag_prefix'] + version or package not in policy['outputs']['packages']:
         raise ValueError('Tag or package differs from the publication contract')
