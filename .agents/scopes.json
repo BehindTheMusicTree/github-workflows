@@ -1,0 +1,6 @@
+{
+  "releases-use-script": {
+    "source": ".agents/rules/releases-use-script.md",
+    "paths": [".github/scripts/release.sh", "CHANGELOG.md", "VERSION"]
+  }
+}

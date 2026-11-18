@@ -1,5 +1,8 @@
 ---
-description: Use release script for every new release request
+paths:
+  - ".github/scripts/release.sh"
+  - "CHANGELOG.md"
+  - "VERSION"
 ---
 
 # Releases Must Use Script
