@@ -50,6 +50,20 @@ class PublishReleaseTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     module.tag_context(TAG)
 
+    def test_tag_context_reads_the_configured_policy_path(self):
+        paths = []
+        def policy_at(commit, path):
+            paths.append(path)
+            return {'tag_prefix': 'graph-v', 'changelog': 'CHANGELOG.md',
+                    'outputs': {'github_release': True, 'packages': []}}
+        validation = {'git': lambda *args: COMMIT + '\n' if args[0] == 'rev-parse' else '',
+                      'policy_at': policy_at, 'check_current': lambda *args: '0.2.0',
+                      'read_file': lambda *args: '## [0.2.0]\n\n- Notes\n'}
+        with patch.dict(module.VALIDATION, validation), \
+                patch.dict('os.environ', {'RELEASE_POLICY_PATH': '.github/graph-policy.json'}):
+            self.assertEqual(module.tag_context('graph-v0.2.0')[2], '- Notes')
+        self.assertEqual(paths, ['.github/graph-policy.json'])
+
     def test_changelog(self):
         text = '## [Unreleased]\n\n- Next\n\n## [2.3.0] - 2026-11-04\n\n### Added\n- Feature\n\n## [2.2.0]\n- Old\n'
         self.assertEqual(module.release_notes(text, TAG, 'v'), '### Added\n- Feature')

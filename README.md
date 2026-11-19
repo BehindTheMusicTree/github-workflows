@@ -624,6 +624,7 @@ means absent. A concurrent 422 is accepted only after reading a published stable
 A package publisher keeps its current workflow file and OIDC identity. After checking out
 this foundation at an immutable SHA, it can run `release/github-release.py notes OUTPUT`
 from its own checkout to validate provenance and extract notes before publishing packages.
+A repository with a non-default policy must set `RELEASE_POLICY_PATH` for that command; otherwise it reads `.github/release-policy.json` and fails on the tag mismatch.
 Its existing GitHub Release owner publishes those notes after every required artifact
 succeeds. The standalone publisher refuses policies listing packages so it cannot bypass
 that ordering. Neither entry point receives the release App key.
