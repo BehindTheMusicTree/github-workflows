@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **One pin for tag and publication**: `release-tag.yml` publishes the GitHub Release of a GitHub-only policy in a `publish` job after tagging (callers grant `contents: write`; a separate `publish.yml` is no longer needed), so the changelog is accepted by the same workflow commit that tagged it. Package policies keep their publisher.
-- **Pin consistency guard**: the validation job fails before tagging when a caller workflow references github-workflows at a commit other than its own (`release/check-workflow-pins.py`).
+- **Pin consistency guard**: the validation job fails before tagging when a caller workflow references `release-tag`, `release-github`, `release-please` or `publish-python` at a commit other than its own (`release/check-workflow-pins.py`).
 
 ### Fixed
 
