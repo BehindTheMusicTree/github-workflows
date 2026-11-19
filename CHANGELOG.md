@@ -10,9 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Multiple release policies**: `release-tag.yml` and `release-github.yml` accept `release-policy-path`, and `github-release.py` derives the version from the policy's `tag_prefix`, so components such as `graph-v*` can be tagged and released by CI.
+- **Release preparation with release-please**: new reusable `release-please.yml` that only opens and updates the release PR with a dedicated preparation App; tagging and publishing stay with `release-tag.yml`. `release/reconcile-release-prs.py` verifies each merged release PR's tags and swaps `autorelease: pending` for `autorelease: tagged`, which release-please needs to keep running with `skip-github-release`. Caller, config, manifest and graph-policy examples are included.
+- **Script guard**: `release.sh` refuses to run when `release-please-config.json` exists, and the agent release rule points to the release PR.
 
 ### Fixed
 
+- **Release validation**: Accept the bare first-release heading `## x.y.z (date)` that release-please writes when a component has no previous tag.
 - **Release validation**: Accept a compare link after the version in the changelog heading (release-please format).
 
 ### Removed

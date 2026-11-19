@@ -1,0 +1,35 @@
+# Place at .github/workflows/release-please.yml in an adopting repository; it replaces examples/release-tag.yml.
+# One tag job per release policy, then release-please: `needs` guarantees the tags exist before the
+# merged release PR is reconciled, so a failed tagging job blocks the next release PR until it is rerun.
+name: Release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  tag-root:
+    # Replace with the full merged, reviewed github-workflows commit SHA (same SHA for every job).
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@REPLACE_WITH_MERGED_COMMIT_SHA
+    with:
+      app-id: ${{ vars.RELEASE_APP_ID }}
+      release-policy-path: .github/release-policy.json
+    secrets:
+      release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+  tag-graph:
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@REPLACE_WITH_MERGED_COMMIT_SHA
+    with:
+      app-id: ${{ vars.RELEASE_APP_ID }}
+      release-policy-path: .github/graph-release-policy.json
+    secrets:
+      release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+  release-please:
+    needs: [tag-root, tag-graph]
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-please.yml@REPLACE_WITH_MERGED_COMMIT_SHA
+    with:
+      app-id: ${{ vars.RELEASE_PR_APP_ID }}
+      release-policies: |
+        .github/release-policy.json
+        .github/graph-release-policy.json
+    secrets:
+      release-pr-app-private-key: ${{ secrets.RELEASE_PR_APP_PRIVATE_KEY }}

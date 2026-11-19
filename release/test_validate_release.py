@@ -139,9 +139,16 @@ class ReleaseValidationTest(unittest.TestCase):
             with self.subTest(heading=heading):
                 self.assertEqual(validator.changelog_section(heading + '\n' + body + '\n## [0.9.0]\n- Old\n', '1.0.0'),
                                  '### Features\n* thing')
-        for heading in ('## [1.0.0](a b)', '## [1.0.0]x', '## [1.0.0]()'):
+        for heading in ('## [1.0.0](a b)', '## [1.0.0]x', '## [1.0.0]()', '## 1.0.0x', '## 1.0.0-rc.1 (2026-11-19)',
+                        '## 11.0.0 (2026-11-19)', '## [1.0.0 (2026-11-19)'):
             with self.subTest(heading=heading), self.assertRaises(ValueError):
                 validator.changelog_section(heading + '\n- x\n', '1.0.0')
+
+    def test_release_please_first_release_heading_without_link(self):
+        # release-please drops the brackets and the compare link when the component has no previous tag.
+        text = '## 0.1.0 (2026-11-19)\n\n### Features\n\n* first\n\n## [Unreleased]\n- Later\n'
+        self.assertEqual(validator.changelog_section(text, '0.1.0'), '### Features\n\n* first')
+        self.assertEqual(validator.changelog_section('## 0.1.0\n- x\n', '0.1.0'), '- x')
 
     def test_empty_and_duplicate_changelog(self):
         for text in ('## [1.0.0]\n', '## [1.0.0]\n### Added\n<!-- nothing -->\n',

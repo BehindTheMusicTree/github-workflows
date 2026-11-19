@@ -9,3 +9,6 @@ paths:
   .github/workflows/publish-python.yml:
     ignore:
       - 'property "workflow_(?:sha|repository)" is not defined in object type'
+  .github/workflows/release-please.yml:
+    ignore:
+      - 'property "workflow_(?:sha|repository)" is not defined in object type'
