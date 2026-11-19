@@ -47,6 +47,14 @@ class CheckWorkflowPinsTests(unittest.TestCase):
             f'  b:\n    uses: {BASE}release-tag.yml@{A}\n'
             f'  c:\n    uses: {BASE}call-redeployment-webhook.yml@v1\n')})
 
+    def test_every_release_workflow_is_checked(self):
+        for name in ('release-github', 'release-please', 'publish-python'):
+            with self.assertRaises(ValueError):
+                self.run_check({'r.yml': f'jobs:\n  a:\n    uses: {BASE}{name}.yml@{B}\n'})
+
+    def test_similarly_named_files_are_ignored(self):
+        self.run_check({'r.yml': f'jobs:\n  a:\n    uses: {BASE}release-tag.yml.bak@{B}\n  b:\n    uses: {BASE}my-release-tag.yml@{B}\n'})
+
     def test_owner_case_is_insensitive(self):
         with self.assertRaises(ValueError):
             self.run_check({'r.yml': f'jobs:\n  a:\n    uses: behindthemusictree/github-workflows/.github/workflows/release-tag.yml@{B}\n'})

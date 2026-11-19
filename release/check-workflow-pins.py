@@ -10,7 +10,7 @@ import sys
 # Line-based: flow-style mappings and folded scalars are not seen.
 REFERENCE = re.compile(
     r'^\s*(?:-\s+)?uses:\s*[\'"]?BehindTheMusicTree/github-workflows/'
-    r'(\.github/workflows/(?:release-tag|release-github|release-please)\.yml)@([^\s\'"#]+)',
+    r'(\.github/workflows/(?:release-tag|release-github|release-please|publish-python)\.yml)@([^\s\'"#]+)',
     re.MULTILINE | re.IGNORECASE)
 SHA = re.compile(r'[0-9a-f]{40}')
 
