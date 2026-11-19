@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Multiple release policies**: `release-tag.yml` and `release-github.yml` accept `release-policy-path`, and `github-release.py` derives the version from the policy's `tag_prefix`, so components such as `graph-v*` can be tagged and released by CI.
+
+### Fixed
+
+- **Release validation**: Accept a compare link after the version in the changelog heading (release-please format).
+
 ### Removed
 
 - Drop the tracked `.agent-plans/.gitignore`: plans now live in the common git directory.

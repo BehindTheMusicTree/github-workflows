@@ -2,6 +2,12 @@ name: Publish GitHub-only release
 
 on:
   workflow_call:
+    inputs:
+      release-policy-path:
+        description: Repository-relative release policy file
+        type: string
+        required: false
+        default: .github/release-policy.json
 
 permissions:
   contents: write
@@ -42,4 +48,5 @@ jobs:
         working-directory: caller
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_POLICY_PATH: ${{ inputs.release-policy-path }}
         run: python3 ../foundation/release/github-release.py publish
