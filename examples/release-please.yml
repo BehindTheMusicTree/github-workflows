@@ -9,7 +9,10 @@ permissions:
   contents: read
 jobs:
   tag-root:
-    # Replace with the full merged, reviewed github-workflows commit SHA (same SHA for every job).
+    # contents: write lets release-tag.yml publish GitHub-only releases; delete any separate publish workflow.
+    permissions:
+      contents: write
+    # Replace with the full merged, reviewed github-workflows commit SHA (same SHA for every job and every other github-workflows caller, publishers included).
     uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@REPLACE_WITH_MERGED_COMMIT_SHA
     with:
       app-id: ${{ vars.RELEASE_APP_ID }}
@@ -17,6 +20,8 @@ jobs:
     secrets:
       release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
   tag-graph:
+    permissions:
+      contents: write
     uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@REPLACE_WITH_MERGED_COMMIT_SHA
     with:
       app-id: ${{ vars.RELEASE_APP_ID }}

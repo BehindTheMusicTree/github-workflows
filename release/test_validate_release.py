@@ -66,6 +66,7 @@ class ReleaseValidationTest(unittest.TestCase):
         after = self.commit()
         self.assertEqual(self.check(after)['commit'], after)
         self.assertEqual(self.check(after)['tag'], 'v1.1.0')
+        self.assertIs(self.check(after)['github_release'], True)
 
     def test_mismatch_and_downgrade_fail(self):
         self.write('VERSION', '1.1.0\n')

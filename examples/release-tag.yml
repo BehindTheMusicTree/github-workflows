@@ -1,4 +1,5 @@
 # Place at .github/workflows/release-tag.yml in an adopting repository.
+# GitHub-only policies are published by this job: do not add a separate tag-triggered publisher.
 name: Release tag
 on:
   push:
@@ -7,6 +8,8 @@ permissions:
   contents: read
 jobs:
   release:
+    permissions:
+      contents: write
     # Replace with the full merged, reviewed github-workflows commit SHA.
     uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@REPLACE_WITH_MERGED_COMMIT_SHA
     with:
