@@ -595,7 +595,7 @@ An adopter commits `.github/release-policy.json` using the [schema](release/rele
 
 A repository releasing several independent components (for example `v*` and `graph-v*`) commits one policy file per component and passes `release-policy-path` to one `release-tag.yml` job per policy; GitHub-only publishers take the same input. The path defaults to `.github/release-policy.json`, and `release/github-release.py` reads it from `RELEASE_POLICY_PATH` with the same default.
 
-Use the [caller example](examples/release-tag.yml), replacing its placeholder with a full **merged and reviewed commit SHA**. Configure `RELEASE_APP_ID` and the explicitly named `RELEASE_APP_PRIVATE_KEY` secret. Install the App on the adopting repository with Contents write permission; select only adopting repositories for organization secrets. Do not pass registry credentials or `secrets: inherit`.
+Use the [caller example](examples/release-tag.yml), replacing its placeholder with a full **merged and reviewed commit SHA**. Every `uses: BehindTheMusicTree/github-workflows/...` in the adopter's `.github/workflows/` (tagging, release-please, publishers) must carry that same SHA: the validation job fails, before any tag exists, when one differs. Align pins in a single PR; a bump of the pin is a release-workflow change like any other. Configure `RELEASE_APP_ID` and the explicitly named `RELEASE_APP_PRIVATE_KEY` secret. Install the App on the adopting repository with Contents write permission; select only adopting repositories for organization secrets. Do not pass registry credentials or `secrets: inherit`.
 
 Before enabling a caller, configure separate tag rulesets: creation permits the release App; update/deletion protection has no App bypass. The App must have no bypass of `main` protection. PR checks must cover the version and publisher changes before merge. If a repository also requires checks after merge, add those jobs in the caller's push workflow and make the reusable-workflow job depend on their successful completion with `needs`. Those checks must operate on `github.sha`, including reruns after a later push; a check of the latest branch tip is insufficient.
 
@@ -612,6 +612,10 @@ Each run creates an annotated tag object, then atomically creates its ref, check
 Run `python3 -m unittest discover -s release -p 'test_*.py'`, `bash .github/scripts/tests/release.sh`, `shellcheck .github/scripts/release.sh .github/scripts/tests/release.sh`, and `actionlint`. Tests simulate tagging and API errors without credentials or remote writes. Python 3.11+ is required. Repository-specific publisher recovery and a live App run are adoption checks, beyond the local foundation tests.
 
 ### GitHub-only publisher and package recovery
+
+**GitHub-only policies are published by `release-tag.yml` itself.** After the tag job, a `publish` job (same pinned commit) validates the tag and creates the GitHub Release when the policy declares `github_release: true` and no `packages`. A separate tag-triggered `publish.yml` is then unnecessary and should be deleted: it re-validated the changelog with its own pin, so a pin older than the tagging one could reject a tag that was already immutable (`exactly one versioned changelog section required`) with no way to recover. The caller job needs `permissions: contents: write` (GitHub checks it statically, even for policies that skip publication). Recovery is "Re-run failed jobs" on the push run, which keeps the same pin and treats an existing tag or release as success. Package policies keep their own publisher.
+
+`release-github.yml` remains for such repositories and for callers not yet migrated; its pin must equal the tagging pin.
 
 Repositories whose policy declares `github_release: true` and an empty `packages` list can
 call `.github/workflows/release-github.yml` from their tag workflow. Pin the caller to a full
@@ -641,7 +645,7 @@ publisher job and retain its npm OIDC configuration and runtime.
 
 ## Release preparation with release-please
 
-[`release-please.yml`](.github/workflows/release-please.yml) only *prepares* releases: it opens and updates a release PR (version, `CHANGELOG.md`, manifest) from the conventional commits merged to `main`. It never tags and never publishes. Merging the release PR is an ordinary release push, validated by the release policies and tagged by `release-tag.yml`; publication stays with the existing tag publishers.
+[`release-please.yml`](.github/workflows/release-please.yml) only *prepares* releases: it opens and updates a release PR (version, `CHANGELOG.md`, manifest) from the conventional commits merged to `main`. It never tags and never publishes. Merging the release PR is an ordinary release push, validated by the release policies and tagged by `release-tag.yml`; publication of a GitHub-only policy happens in the same run, and package publishers stay tag-triggered.
 
 Two Apps keep the duties apart: the tag App (`RELEASE_APP_ID`, Contents write, sole bypass of the tag-creation ruleset) and a preparation App (`RELEASE_PR_APP_ID` and the `RELEASE_PR_APP_PRIVATE_KEY` secret: Contents, Pull requests and Issues write, **no** ruleset bypass). Both are declared in `github-config`; an org admin creates and installs the preparation App. The tag rulesets must cover the prefix of every policy (for example `graph-v*`).
 
@@ -651,7 +655,7 @@ Adopting:
 
 1. Commit `release-please-config.json` and `.release-please-manifest.json` ([config](examples/release-please-config.json), [manifest](examples/.release-please-manifest.json)) with the manifest at the current versions, and one release policy per component ([root](examples/release-policy.json), [graph](examples/graph-release-policy.json)). The `.` package uses `simple` with `version-file`, `include-component-in-tag: false` and `exclude-paths` for the other components.
 2. Remove the `## [Unreleased]` section from each changelog: release-please inserts its section above it, which would leave the entries stranded below.
-3. Replace the `release-tag.yml` caller by the [combined caller](examples/release-please.yml): one tagging job per policy, then `release-please` with `needs` on all of them, so tags exist before reconciliation. Pin every `uses` to the same merged commit SHA.
+3. Replace the `release-tag.yml` caller by the [combined caller](examples/release-please.yml): one tagging job per policy, then `release-please` with `needs` on all of them, so tags exist before reconciliation. Pin every `uses` (including any remaining publisher) to the same merged commit SHA; `release-tag.yml` enforces it.
 4. Install the preparation App on the repository and set `RELEASE_PR_APP_ID` and `RELEASE_PR_APP_PRIVATE_KEY`.
 5. Use squash merges with the PR title as the commit title, and conventional PR titles (`feat:`, `fix:`, `feat!:`): release-please ignores a non-conventional squash title. Merge the release PR with its title unchanged.
 

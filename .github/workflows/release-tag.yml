@@ -1,4 +1,5 @@
 # Helper scripts load from job.workflow_sha (the caller's pin of this workflow), so no caller code runs with App secrets.
+# The same pin validates, tags and (for GitHub-only policies) publishes the release, so they cannot disagree.
 name: Validate and tag release
 
 on:
@@ -31,6 +32,7 @@ jobs:
       release: ${{ steps.intent.outputs.release }}
       tag: ${{ steps.intent.outputs.tag }}
       commit: ${{ steps.intent.outputs.commit }}
+      github-release: ${{ steps.intent.outputs.github_release }}
     steps:
       - name: Require the caller-pinned workflow commit
         env:
@@ -60,6 +62,11 @@ jobs:
           ref: ${{ job.workflow_sha }}
           persist-credentials: false
           path: foundation
+      - name: Require one github-workflows commit across the caller's workflows
+        working-directory: caller
+        env:
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: python3 ../foundation/release/check-workflow-pins.py .github/workflows
       - name: Validate the exact push
         id: intent
         working-directory: caller
@@ -69,7 +76,7 @@ jobs:
           POLICY: ${{ inputs.release-policy-path }}
         run: |
           python3 ../foundation/release/validate-release.py "$BEFORE" "$AFTER" "$POLICY" > "$RUNNER_TEMP/release-intent.json"
-          jq -r '"release=\(.release)", "tag=\(.tag // "")", "commit=\(.commit // "")"' "$RUNNER_TEMP/release-intent.json" >> "$GITHUB_OUTPUT"
+          jq -r '"release=\(.release)", "tag=\(.tag // "")", "commit=\(.commit // "")", "github_release=\(.github_release // false)"' "$RUNNER_TEMP/release-intent.json" >> "$GITHUB_OUTPUT"
 
   tag:
     needs: validate
@@ -111,3 +118,39 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
           COMMIT: ${{ needs.validate.outputs.commit }}
         run: python3 release/create-tag.py "$TAG" "$COMMIT"
+
+  # Publishing here, with the pin that just validated and tagged, replaces a separate tag-triggered
+  # release-github.yml caller whose pin could diverge. A package policy keeps its own publisher.
+  publish:
+    needs: [validate, tag]
+    if: needs.validate.outputs.github-release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Require the caller-pinned workflow commit
+        env:
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        run: |
+          [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Workflow commit SHA unavailable' >&2; exit 1; }
+          test "$WORKFLOW_REPOSITORY" = BehindTheMusicTree/github-workflows || { echo 'Unexpected workflow repository' >&2; exit 1; }
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: caller
+      - uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/github-workflows
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+          path: foundation
+      - name: Validate and publish the tag
+        working-directory: caller
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_POLICY_PATH: ${{ inputs.release-policy-path }}
+        run: python3 ../foundation/release/github-release.py publish

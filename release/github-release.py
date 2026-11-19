@@ -76,7 +76,8 @@ def tag_context(tag):
 def main():
     if len(sys.argv) not in (2, 3) or sys.argv[1] not in ('publish', 'notes'):
         raise ValueError('Usage: github-release.py publish | notes OUTPUT_PATH')
-    tag = os.environ['GITHUB_REF_NAME']
+    # release-tag.yml publishes right after tagging on a branch push, so it names the tag explicitly.
+    tag = os.environ.get('RELEASE_TAG') or os.environ['GITHUB_REF_NAME']
     commit, policy, notes = tag_context(tag)
     if sys.argv[1] == 'notes':
         if len(sys.argv) != 3:

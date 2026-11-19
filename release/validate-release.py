@@ -159,7 +159,10 @@ def validate(before, after, policy_path):
         raise ValueError("release policy changes and version bumps require separate pushes")
     if tuple(map(int, new.split("."))) <= tuple(map(int, old.split("."))):
         raise ValueError("version must increase")
-    return {"release": True, "version": new, "tag": policy["tag_prefix"] + new, "commit": after}
+    outputs = policy["outputs"]
+    return {"release": True, "version": new, "tag": policy["tag_prefix"] + new, "commit": after,
+            # Package publishers keep their own tag-triggered owner of the GitHub Release.
+            "github_release": bool(outputs["github_release"] and not outputs["packages"])}
 
 
 if __name__ == "__main__":

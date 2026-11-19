@@ -120,6 +120,21 @@ class PublishReleaseTests(unittest.TestCase):
         with self.assertRaises(module.APIError):
             module.publish(FakeAPI([module.APIError(404), module.APIError(422), module.APIError(404)]), TAG, COMMIT, 'Notes')
 
+    def test_main_publishes_the_explicit_release_tag_over_the_branch_ref(self):
+        policy = {'outputs': {'packages': []}}
+        seen = []
+        def context(tag):
+            seen.append(tag)
+            return COMMIT, policy, 'Notes'
+        env = {'RELEASE_TAG': TAG, 'GITHUB_REF_NAME': 'main', 'GITHUB_REPOSITORY': 'o/r',
+               'GH_TOKEN': 't', 'GITHUB_API_URL': 'https://api.github.com'}
+        with patch.object(module, 'tag_context', context), patch.object(module, 'GitHub'), \
+                patch.dict(module.TAGGING, {'existing_commit': lambda api, tag: COMMIT}), \
+                patch.object(module, 'publish', return_value='created'), \
+                patch.dict('os.environ', env), patch('sys.argv', ['github-release.py', 'publish']):
+            module.main()
+        self.assertEqual(seen, [TAG])
+
 
 if __name__ == '__main__':
     unittest.main()

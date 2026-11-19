@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release preparation with release-please**: new reusable `release-please.yml` that only opens and updates the release PR with a dedicated preparation App; tagging and publishing stay with `release-tag.yml`. `release/reconcile-release-prs.py` verifies each merged release PR's tags and swaps `autorelease: pending` for `autorelease: tagged`, which release-please needs to keep running with `skip-github-release`. Caller, config, manifest and graph-policy examples are included.
 - **Script guard**: `release.sh` refuses to run when `release-please-config.json` exists, and the agent release rule points to the release PR.
 
+### Changed
+
+- **One pin for tag and publication**: `release-tag.yml` publishes the GitHub Release of a GitHub-only policy in a `publish` job after tagging (callers grant `contents: write`; a separate `publish.yml` is no longer needed), so the changelog is accepted by the same workflow commit that tagged it. Package policies keep their publisher.
+- **Pin consistency guard**: the validation job fails before tagging when a caller workflow references github-workflows at a commit other than its own (`release/check-workflow-pins.py`).
+
 ### Fixed
 
 - **Release validation**: Accept the bare first-release heading `## x.y.z (date)` that release-please writes when a component has no previous tag.
