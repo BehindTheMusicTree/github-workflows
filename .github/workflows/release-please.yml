@@ -1,0 +1,103 @@
+# Prepares release PRs only: tagging and publishing stay with release-tag.yml and its publishers.
+# Helper scripts load from job.workflow_sha (the caller's pin of this workflow), so no caller code runs with App secrets.
+name: Prepare release PR
+
+on:
+  workflow_call:
+    inputs:
+      app-id:
+        description: Release PR GitHub App ID (no ruleset bypass; Contents, Pull requests and Issues write)
+        type: string
+        required: true
+      release-policies:
+        description: Newline-separated release policy files whose tags must exist before a merged release PR is reconciled
+        type: string
+        required: true
+      config-file:
+        description: release-please configuration file
+        type: string
+        required: false
+        default: release-please-config.json
+      manifest-file:
+        description: release-please manifest file
+        type: string
+        required: false
+        default: .release-please-manifest.json
+    secrets:
+      release-pr-app-private-key:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    # A superseded run is harmless: release-please recomputes everything from the main HEAD.
+    concurrency:
+      group: release-please-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - name: Require the caller-pinned workflow commit
+        env:
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+        run: |
+          [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Workflow commit SHA unavailable' >&2; exit 1; }
+          test "$WORKFLOW_REPOSITORY" = BehindTheMusicTree/github-workflows || { echo 'Unexpected workflow repository' >&2; exit 1; }
+      - name: Require a main push
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          DELETED: ${{ github.event.deleted }}
+        run: |
+          test "$EVENT" = push
+          test "$REF" = refs/heads/main
+          test "$DELETED" = false
+      - name: Require App configuration
+        env:
+          APP_ID: ${{ inputs.app-id }}
+          APP_PRIVATE_KEY: ${{ secrets.release-pr-app-private-key }}
+          POLICIES: ${{ inputs.release-policies }}
+        run: |
+          test -n "$APP_ID" || { echo 'Release PR App ID missing' >&2; exit 1; }
+          test -n "$APP_PRIVATE_KEY" || { echo 'Release PR App private key missing' >&2; exit 1; }
+          grep -q '[^[:space:]]' <<< "$POLICIES" || { echo 'At least one release policy is required' >&2; exit 1; }
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: caller
+      - uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/github-workflows
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+          path: foundation
+      - name: Create repository-scoped App token
+        id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ inputs.app-id }}
+          private-key: ${{ secrets.release-pr-app-private-key }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      # Runs first: release-please aborts while a merged release PR is still labelled pending.
+      - name: Reconcile merged release PRs
+        working-directory: caller
+        env:
+          RELEASE_PR_APP_TOKEN: ${{ steps.app.outputs.token }}
+          POLICIES: ${{ inputs.release-policies }}
+        run: |
+          mapfile -t policies < <(grep '[^[:space:]]' <<< "$POLICIES" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+          python3 ../foundation/release/reconcile-release-prs.py "${policies[@]}"
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app.outputs.token }}
+          config-file: ${{ inputs.config-file }}
+          manifest-file: ${{ inputs.manifest-file }}
+          skip-github-release: true

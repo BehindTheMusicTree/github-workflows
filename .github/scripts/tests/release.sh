@@ -38,3 +38,13 @@ if bash "$script" publish; then
   echo 'Manual publication with a CI policy should fail' >&2
   exit 1
 fi
+git checkout -qb release-please-test
+rm .github/release-policy.json
+printf '{}\n' > release-please-config.json
+for type in patch publish; do
+  if output="$(bash "$script" "$type" 2>&1)"; then
+    echo "Release script must refuse $type when release-please prepares releases" >&2
+    exit 1
+  fi
+  [[ "$output" == *'release-please'* ]]
+done

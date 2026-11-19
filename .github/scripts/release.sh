@@ -30,6 +30,11 @@ bump_type="$1"
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+if [[ -f release-please-config.json ]]; then
+  echo "ERROR: this repository prepares releases with release-please; review and merge its release PR instead." >&2
+  exit 1
+fi
+
 if [[ "$bump_type" == "publish" ]]; then
   if [[ -f .github/release-policy.json ]]; then
     echo "ERROR: CI owns tagging for this repository; follow the release workflow run." >&2
