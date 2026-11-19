@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-11-19
+
+
 ### Added
 
 - **Multiple release policies**: `release-tag.yml` and `release-github.yml` accept `release-policy-path`, and `github-release.py` derives the version from the policy's `tag_prefix`, so components such as `graph-v*` can be tagged and released by CI.
