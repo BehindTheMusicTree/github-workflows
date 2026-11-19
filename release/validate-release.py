@@ -115,7 +115,7 @@ def changelog_section(text, version):
         if fence is None and line.startswith("## "):
             headings.append((index, line))
     matches = [index for index, line in headings
-               if re.fullmatch(r"## \[" + re.escape(version) + r"\](?:[^\S\n][^\n]*)?", line)]
+               if re.fullmatch(r"## \[" + re.escape(version) + r"\](?:\([^()\s]+\))?(?:[^\S\n][^\n]*)?", line)]
     if len(matches) != 1:
         raise ValueError("exactly one versioned changelog section required")
     end = next((index for index, _ in headings if index > matches[0]), len(lines))

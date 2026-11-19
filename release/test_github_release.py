@@ -38,7 +38,7 @@ class PublishReleaseTests(unittest.TestCase):
         validation = {'git': git, 'policy_at': lambda *args: policy,
                       'check_current': lambda *args: '2.3.0',
                       'read_file': lambda *args: '## [2.3.0] - 2026-11-04\n\n- Notes\n'}
-        with patch.dict(module.VALIDATION, validation):
+        with patch.dict(module.VALIDATION, validation), patch.dict('os.environ', {'RELEASE_POLICY_PATH': '.github/release-policy.json'}):
             self.assertEqual(module.tag_context(TAG), (COMMIT, policy, '- Notes'))
             self.assertIn(('merge-base', '--is-ancestor', COMMIT, 'refs/remotes/origin/main'), calls)
             with self.assertRaises(ValueError):
@@ -52,12 +52,19 @@ class PublishReleaseTests(unittest.TestCase):
 
     def test_changelog(self):
         text = '## [Unreleased]\n\n- Next\n\n## [2.3.0] - 2026-11-04\n\n### Added\n- Feature\n\n## [2.2.0]\n- Old\n'
-        self.assertEqual(module.release_notes(text, TAG), '### Added\n- Feature')
+        self.assertEqual(module.release_notes(text, TAG, 'v'), '### Added\n- Feature')
         for text in ('', '## [2.3.0]\n### Added\n', '## [2.3.0]\nA\n## [2.3.0]\nB'):
             with self.subTest(text=text), self.assertRaises(ValueError):
-                module.release_notes(text, TAG)
+                module.release_notes(text, TAG, 'v')
         with self.assertRaises(ValueError):
-            module.release_notes('## [2.3.0]\nA', 'v2.3.0-rc.1')
+            module.release_notes('## [2.3.0]\nA', 'v2.3.0-rc.1', 'v')
+
+    def test_prefixed_tag_and_release_please_heading(self):
+        text = '## [0.2.0](https://github.com/o/r/compare/graph-v0.1.0...graph-v0.2.0) (2026-11-19)\n\n### Features\n* graph\n\n## [0.1.0]\n- Old\n'
+        self.assertEqual(module.release_notes(text, 'graph-v0.2.0', 'graph-v'), '### Features\n* graph')
+        for tag in ('v0.2.0', 'graph-v0.2', 'graph-v0.2.0-rc.1'):
+            with self.subTest(tag=tag), self.assertRaises(ValueError):
+                module.release_notes(text, tag, 'graph-v')
 
     def test_fenced_headings_preserve_complete_release_notes(self):
         for fence in ('```md', '~~~markdown', '````md'):
@@ -65,7 +72,7 @@ class PublishReleaseTests(unittest.TestCase):
             notes = '- Example syntax:\n\n' + fence + '\n## Example\n## [2.3.0]\n' + close + '\n\n- Other fix.'
             text = '```md\n## [2.3.0]\n- Example version\n```\n\n## [2.3.0]\n\n' + notes + '\n\n## [2.2.0]\n- Old'
             with self.subTest(fence=fence):
-                self.assertEqual(module.release_notes(text, TAG), notes)
+                self.assertEqual(module.release_notes(text, TAG, 'v'), notes)
 
     def test_create_then_retry_without_duplicate(self):
         api = FakeAPI([module.APIError(404), RELEASE])

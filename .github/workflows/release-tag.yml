@@ -8,6 +8,11 @@ on:
         description: Release GitHub App ID
         type: string
         required: true
+      release-policy-path:
+        description: Repository-relative release policy file
+        type: string
+        required: false
+        default: .github/release-policy.json
     secrets:
       release-app-private-key:
         required: true
@@ -61,7 +66,7 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
-          POLICY: .github/release-policy.json
+          POLICY: ${{ inputs.release-policy-path }}
         run: |
           python3 ../foundation/release/validate-release.py "$BEFORE" "$AFTER" "$POLICY" > "$RUNNER_TEMP/release-intent.json"
           jq -r '"release=\(.release)", "tag=\(.tag // "")", "commit=\(.commit // "")"' "$RUNNER_TEMP/release-intent.json" >> "$GITHUB_OUTPUT"

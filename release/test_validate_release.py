@@ -132,6 +132,17 @@ class ReleaseValidationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'mirror mismatch'):
             self.check(self.commit())
 
+    def test_release_please_heading_accepted(self):
+        body = '\n### Features\n* thing\n'
+        for heading in ('## [1.0.0](https://github.com/o/r/compare/v0.9.0...v1.0.0) (2026-11-19)',
+                        '## [1.0.0](https://github.com/o/r/compare/v0.9.0...v1.0.0)', '## [1.0.0] - 2026-11-19'):
+            with self.subTest(heading=heading):
+                self.assertEqual(validator.changelog_section(heading + '\n' + body + '\n## [0.9.0]\n- Old\n', '1.0.0'),
+                                 '### Features\n* thing')
+        for heading in ('## [1.0.0](a b)', '## [1.0.0]x', '## [1.0.0]()'):
+            with self.subTest(heading=heading), self.assertRaises(ValueError):
+                validator.changelog_section(heading + '\n- x\n', '1.0.0')
+
     def test_empty_and_duplicate_changelog(self):
         for text in ('## [1.0.0]\n', '## [1.0.0]\n### Added\n<!-- nothing -->\n',
                      '## [1.0.0]\n- First.\n## [1.0.0]\n- Duplicate.\n'):

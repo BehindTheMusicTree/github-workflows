@@ -12,14 +12,16 @@ from urllib.parse import quote
 DIRECTORY = Path(__file__).resolve().parent
 TAGGING = runpy.run_path(str(DIRECTORY / 'create-tag.py'))
 VALIDATION = runpy.run_path(str(DIRECTORY / 'validate-release.py'))
+DEFAULT_POLICY = '.github/release-policy.json'
 APIError = TAGGING['APIError']
 GitHub = TAGGING['GitHub']
 
 
-def release_notes(changelog, tag):
-    if not re.fullmatch(r'v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', tag):
-        raise ValueError('Expected a stable vX.Y.Z tag')
-    return VALIDATION['changelog_section'](changelog, tag[1:])
+def release_notes(changelog, tag, tag_prefix):
+    version = tag[len(tag_prefix):] if tag.startswith(tag_prefix) else ''
+    if not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', version):
+        raise ValueError(f'Expected a stable {tag_prefix}X.Y.Z tag')
+    return VALIDATION['changelog_section'](changelog, version)
 
 
 def verify_release(release, tag):
@@ -62,12 +64,12 @@ def tag_context(tag):
     if git('rev-parse', f'refs/tags/{tag}^{{commit}}').strip() != commit:
         raise ValueError('Checkout does not match the dereferenced tag')
     git('merge-base', '--is-ancestor', commit, 'refs/remotes/origin/main')
-    policy = VALIDATION['policy_at'](commit, '.github/release-policy.json')
+    policy = VALIDATION['policy_at'](commit, os.environ.get('RELEASE_POLICY_PATH', DEFAULT_POLICY))
     version = VALIDATION['check_current'](commit, policy)
     if tag != policy['tag_prefix'] + version or not policy['outputs']['github_release']:
         raise ValueError('Tag or GitHub Release output differs from the policy')
     changelog = VALIDATION['read_file'](commit, policy['changelog'])
-    notes = release_notes(changelog, 'v' + version)
+    notes = release_notes(changelog, tag, policy['tag_prefix'])
     return commit, policy, notes
 
 
