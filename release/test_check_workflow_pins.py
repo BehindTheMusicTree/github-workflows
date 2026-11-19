@@ -39,6 +39,18 @@ class CheckWorkflowPinsTests(unittest.TestCase):
     def test_other_actions_and_comments_are_ignored(self):
         self.run_check({'ci.yml': f'# uses: {BASE}release-tag.yml@{B}\njobs:\n  a:\n    steps:\n      - uses: actions/checkout@v5\n'})
 
+    def test_composite_actions_and_other_workflows_are_ignored(self):
+        self.run_check({'ci.yml': (
+            'jobs:\n  a:\n    steps:\n'
+            f'      - uses: BehindTheMusicTree/github-workflows/.github/actions/setup@v4.2.0\n'
+            f'      - uses: BehindTheMusicTree/github-workflows/.github/actions/publish-python@{B}\n'
+            f'  b:\n    uses: {BASE}release-tag.yml@{A}\n'
+            f'  c:\n    uses: {BASE}call-redeployment-webhook.yml@v1\n')})
+
+    def test_owner_case_is_insensitive(self):
+        with self.assertRaises(ValueError):
+            self.run_check({'r.yml': f'jobs:\n  a:\n    uses: behindthemusictree/github-workflows/.github/workflows/release-tag.yml@{B}\n'})
+
 
 if __name__ == '__main__':
     unittest.main()

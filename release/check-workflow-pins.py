@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Fail unless every github-workflows reference in the caller's workflows uses one commit."""
+"""Fail unless every github-workflows release workflow reference uses one commit."""
 
 import os
 from pathlib import Path
 import re
 import sys
 
-REFERENCE = re.compile(r'^\s*(?:-\s+)?uses:\s*[\'"]?BehindTheMusicTree/github-workflows/(\S+?)@([^\s\'"#]+)', re.MULTILINE)
+# Only the release workflows must agree; composite actions and other workflows have their own pins.
+# Line-based: flow-style mappings and folded scalars are not seen.
+REFERENCE = re.compile(
+    r'^\s*(?:-\s+)?uses:\s*[\'"]?BehindTheMusicTree/github-workflows/'
+    r'(\.github/workflows/(?:release-tag|release-github|release-please)\.yml)@([^\s\'"#]+)',
+    re.MULTILINE | re.IGNORECASE)
 SHA = re.compile(r'[0-9a-f]{40}')
 
 
