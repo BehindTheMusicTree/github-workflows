@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`python-artifact.py verify` waits for the registry**: it reads the project's PyPI Simple index (PEP 691) instead of the per-version JSON URL, whose 404 cached by `prepare` outlived the upload, and retries for up to 660 s (`--wait-seconds`, `0` reads once) while files are missing or the registry answers 429/5xx. Digest mismatches, foreign or yanked files and other 4xx still fail at once; `prepare` never retries.
+- **Published-package example**: `verify-public-dependency` pins `example-graph==<version>` and retries for up to 660 s, because pip otherwise installs an older graph while the cached Simple index is stale; `release-please` uses an explicit `!cancelled()` condition.
+
+### Documentation
+
+- README: the two PyPI caches, the worst case of about 11 minutes without a rerun, the root-range check, `docs:` commits opening release PRs, and reruns reusing the old workflow SHA.
+
 ## [6.0.0] - 2026-11-20
 
 
