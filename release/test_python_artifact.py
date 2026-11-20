@@ -1,9 +1,11 @@
 import hashlib
 import importlib.util
 import io
+from http.client import IncompleteRead
 import json
 import os
 import shutil
+import ssl
 import subprocess
 import sys
 from pathlib import Path
@@ -195,7 +197,8 @@ class PythonArtifactTests(unittest.TestCase):
 
     def test_verify_retries_transient_registry_errors(self):
         for error in [HTTPError('url', code, 'failure', {}, None) for code in (429, 500, 503)] + [
-                URLError('offline'), TimeoutError('slow'), ConnectionResetError('reset')]:
+                URLError('offline'), TimeoutError('slow'), ConnectionResetError('reset'),
+                ssl.SSLError('handshake'), IncompleteRead(b'{')]:
             with self.subTest(error=error):
                 opener = self.sequence(error, self.page())
                 sleeps, raised = self.attempt_verify(opener)

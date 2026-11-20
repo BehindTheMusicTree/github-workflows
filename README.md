@@ -141,7 +141,9 @@ Do not add a global concurrency group: cancelling or queueing runs could drop a 
 release bump. A registry visibility delay no longer needs a rerun (see the waits above);
 **Re-run failed jobs** is only for a real failure. It reruns `publish-graph` and its
 dependents with the same `job.workflow_sha`, and `prepare` uploads the files it does not
-see; an identical re-upload of a published file is accepted by PyPI and harmless. A rerun
+see. PyPI rejects a re-upload of an existing filename, so rerun only after the Simple page has
+had time to refresh (about 10 minutes after the upload); an earlier rerun can stage a file
+that is already published and fail the upload step. A rerun
 reuses the old workflow SHA: close and reopen a release PR to run `validate.yml` with the
 current workflow. Rebuilding must reproduce the original bytes, so rerun the failed job
 rather than the whole run; a digest mismatch requires investigation. Do not enable blind

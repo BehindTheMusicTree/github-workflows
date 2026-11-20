@@ -4,6 +4,7 @@
 import argparse
 from email.parser import BytesParser
 import hashlib
+from http.client import HTTPException
 import json
 import logging
 import os
@@ -11,6 +12,7 @@ from pathlib import Path
 import re
 import runpy
 import shutil
+import ssl
 import sys
 import tarfile
 import time
@@ -195,7 +197,7 @@ def prepare(package, version, directory, pending, opener=urlopen, registry='pypi
 def retryable(error):
     if isinstance(error, HTTPError):
         return error.code == 429 or error.code >= 500
-    return isinstance(error, (URLError, TimeoutError, ConnectionError))
+    return isinstance(error, (URLError, TimeoutError, ConnectionError, ssl.SSLError, HTTPException))
 
 
 def verify(package, version, directory, opener=urlopen, registry='pypi',
@@ -210,7 +212,7 @@ def verify(package, version, directory, opener=urlopen, registry='pypi',
             if not missing:
                 return
             reason = f'missing {", ".join(missing)}'
-        except OSError as error:
+        except (OSError, HTTPException) as error:
             # A digest mismatch or a malformed page (ValueError, KeyError, TypeError) fails at once.
             if not retryable(error):
                 raise
