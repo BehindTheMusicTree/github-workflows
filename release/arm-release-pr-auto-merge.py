@@ -18,10 +18,11 @@ DIRECTORY = Path(__file__).resolve().parent
 TAGGING = runpy.run_path(str(DIRECTORY / 'create-tag.py'))
 GitHub = TAGGING['GitHub']
 BRANCH = 'main'
+HEAD_PREFIX = 'release-please--'
 PENDING = 'autorelease: pending'
 PAGE_SIZE = 100
 MAX_PAGES = 5
-# GitHub refuses to arm auto-merge when nothing is left to wait for.
+# GitHub refuses to arm auto-merge when nothing is left to wait for; the PR is then merged directly.
 CLEAN_STATUS = 'clean status'
 MUTATION = (
     'mutation($id: ID!, $headline: String!, $oid: GitObjectID!) {'
@@ -50,11 +51,17 @@ def graphql(query, variables, token):
     return subprocess.run(command, env={**os.environ, 'GH_TOKEN': token}, capture_output=True, text=True, check=False)
 
 
-def arm(api, token, run=graphql):
+def release_branch(pull, repository):
+    # The label alone is not proof of origin: only a release-please branch of this repository is armed.
+    head_repo = (pull['head'].get('repo') or {}).get('full_name')
+    return head_repo == repository and pull['head']['ref'].startswith(HEAD_PREFIX)
+
+
+def arm(api, token, repository, run=graphql):
     armed = []
     for number in open_release_pull_requests(api):
         pull = api.request('GET', f'/pulls/{number}')
-        if pull['state'] != 'open' or pull['base']['ref'] != BRANCH:
+        if pull['state'] != 'open' or pull['base']['ref'] != BRANCH or not release_branch(pull, repository):
             continue
         title, head = pull['title'], pull['head']['sha']
         if not title.strip() or not re.fullmatch(r'[0-9a-f]{40}', head):
@@ -62,7 +69,12 @@ def arm(api, token, run=graphql):
         result = run(MUTATION, {'id': pull['node_id'], 'headline': title, 'oid': head}, token)
         if result.returncode != 0:
             if CLEAN_STATUS in (result.stderr + result.stdout).lower():
-                logging.info('PR #%s is already clean: left for the next run to arm', number)
+                # Nothing left to wait for; the sha pin and the branch rules still gate this merge, and
+                # no later run would arm it.
+                logging.info('PR #%s is already clean: merging it directly', number)
+                api.request('PUT', f'/pulls/{number}/merge',
+                            {'merge_method': 'squash', 'commit_title': title, 'commit_message': '', 'sha': head})
+                armed.append(number)
                 continue
             raise ValueError(f'Cannot arm auto-merge on PR #{number}: {result.stderr.strip() or result.stdout.strip()}')
         armed.append(number)
@@ -72,7 +84,7 @@ def arm(api, token, run=graphql):
 def main():
     token = os.environ['RELEASE_PR_APP_TOKEN']
     api = GitHub(os.environ['GITHUB_REPOSITORY'], token, os.environ['GITHUB_API_URL'])
-    armed = arm(api, token)
+    armed = arm(api, token, os.environ['GITHUB_REPOSITORY'])
     logging.info('Armed auto-merge on release PRs: %s', ', '.join(f'#{n}' for n in armed) or 'none')
 
 

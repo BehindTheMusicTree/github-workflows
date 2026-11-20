@@ -7,11 +7,12 @@ spec = importlib.util.spec_from_file_location('armer', Path(__file__).with_name(
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 HEAD = 'c' * 40
+REPO = 'owner/repo'
 
 
 def pull(number=7, **changes):
     return {'number': number, 'state': 'open', 'node_id': f'PR_{number}', 'title': 'chore: release main',
-            'head': {'sha': HEAD}, 'base': {'ref': 'main'}, **changes}
+            'head': {'sha': HEAD, 'ref': 'release-please--branches--main', 'repo': {'full_name': REPO}}, 'base': {'ref': 'main'}, **changes}
 
 
 class FakeAPI:
@@ -19,8 +20,12 @@ class FakeAPI:
         self.issues = list(issues)
         self.pulls = pulls if pulls is not None else {7: pull()}
         self.pages = []
+        self.writes = []
 
     def request(self, method, path, data=None):
+        if method == 'PUT':
+            self.writes.append((method, path, data))
+            return {'merged': True}
         assert method == 'GET', (method, path)
         if path.startswith('/issues?'):
             self.pages.append(path)
@@ -43,41 +48,53 @@ class Runner:
 class ArmTests(unittest.TestCase):
     def test_arms_squash_with_exact_title_and_pinned_head(self):
         api, run = FakeAPI(), Runner()
-        self.assertEqual(module.arm(api, 'token', run), [7])
+        self.assertEqual(module.arm(api, 'token', REPO, run), [7])
         self.assertEqual(run.calls, [(module.MUTATION, {'id': 'PR_7', 'headline': 'chore: release main', 'oid': HEAD}, 'token')])
         self.assertIn('mergeMethod: SQUASH', module.MUTATION)
         self.assertIn('state=open&labels=autorelease%3A%20pending', api.pages[0])
 
     def test_nothing_pending_is_a_noop(self):
         run = Runner()
-        self.assertEqual(module.arm(FakeAPI(issues=()), 'token', run), [])
+        self.assertEqual(module.arm(FakeAPI(issues=()), 'token', REPO, run), [])
         self.assertEqual(run.calls, [])
 
     def test_closed_and_other_branch_prs_are_ignored(self):
         for changes in ({'state': 'closed'}, {'base': {'ref': 'develop'}}):
             with self.subTest(changes=changes):
                 run = Runner()
-                self.assertEqual(module.arm(FakeAPI(pulls={7: pull(**changes)}), 'token', run), [])
+                self.assertEqual(module.arm(FakeAPI(pulls={7: pull(**changes)}), 'token', REPO, run), [])
                 self.assertEqual(run.calls, [])
 
-    def test_clean_status_is_left_for_the_next_run(self):
+    def test_clean_status_merges_directly_with_pinned_head(self):
+        api = FakeAPI()
         run = Runner(1, 'Pull request is in clean status')
-        self.assertEqual(module.arm(FakeAPI(), 'token', run), [])
+        self.assertEqual(module.arm(api, 'token', REPO, run), [7])
+        self.assertEqual(api.writes, [('PUT', '/pulls/7/merge', {
+            'merge_method': 'squash', 'commit_title': 'chore: release main', 'commit_message': '', 'sha': HEAD})])
+
+    def test_labelled_prs_not_from_release_please_are_ignored(self):
+        for head in ({'sha': HEAD, 'ref': 'feature/x', 'repo': {'full_name': REPO}},
+                     {'sha': HEAD, 'ref': 'release-please--branches--main', 'repo': {'full_name': 'fork/repo'}},
+                     {'sha': HEAD, 'ref': 'release-please--branches--main', 'repo': None}):
+            with self.subTest(head=head):
+                run = Runner()
+                self.assertEqual(module.arm(FakeAPI(pulls={7: pull(head=head)}), 'token', REPO, run), [])
+                self.assertEqual(run.calls, [])
 
     def test_other_failures_fail_closed(self):
         with self.assertRaisesRegex(ValueError, 'Cannot arm auto-merge on PR #7: boom'):
-            module.arm(FakeAPI(), 'token', Runner(1, 'boom'))
+            module.arm(FakeAPI(), 'token', REPO, Runner(1, 'boom'))
 
     def test_unusable_title_or_head_fails(self):
-        for changes in ({'title': ' '}, {'head': {'sha': 'abc'}}):
+        for changes in ({'title': ' '}, {'head': {'sha': 'abc', 'ref': 'release-please--branches--main', 'repo': {'full_name': REPO}}}):
             with self.subTest(changes=changes):
                 with self.assertRaises(ValueError):
-                    module.arm(FakeAPI(pulls={7: pull(**changes)}), 'token', Runner())
+                    module.arm(FakeAPI(pulls={7: pull(**changes)}), 'token', REPO, Runner())
 
     def test_listing_beyond_the_page_limit_fails(self):
         api = FakeAPI(issues=range(module.PAGE_SIZE * module.MAX_PAGES))
         with self.assertRaisesRegex(ValueError, 'Too many'):
-            module.arm(api, 'token', Runner())
+            module.arm(api, 'token', REPO, Runner())
 
 
 if __name__ == '__main__':
