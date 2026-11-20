@@ -4,5 +4,5 @@
   "mirrors": [],
   "tag_prefix": "graph-v",
   "changelog": "graph/CHANGELOG.md",
-  "outputs": { "github_release": false, "packages": [] }
+  "outputs": { "github_release": false, "packages": ["example-graph"] }
 }

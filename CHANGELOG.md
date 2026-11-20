@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- README: mark the tag-push mode with `release-github.yml` and local `release.sh` as deprecated, listing the callers that still use them; fix the statement that package publishers stay tag-triggered.
+- `examples/graph-release-policy.json` lists its package in `outputs.packages`, as the published-package example requires.
+
 ## [6.1.0] - 2026-11-20
 
 
