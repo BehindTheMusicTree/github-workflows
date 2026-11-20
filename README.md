@@ -624,4 +624,12 @@ Adopting:
 4. Install the preparation App on the repository and set `RELEASE_PR_APP_ID` and `RELEASE_PR_APP_PRIVATE_KEY`.
 5. Use squash merges with the PR title as the commit title, and conventional PR titles (`feat:`, `fix:`, `feat!:`): release-please ignores a non-conventional squash title. Merge the release PR with its title unchanged.
 
-Release-please is the only way to prepare releases in an adopting repository: `.github/scripts/release.sh` refuses to run once `release-please-config.json` exists. The changelog is generated; edit the release PR's changelog when its wording needs a change, and do not edit `CHANGELOG.md` in feature PRs. A conventional-title check for PRs is not part of this workflow. Run `python3 -m unittest discover -s release -p 'test_*.py'` for the tests.
+Release-please is the only way to prepare releases in an adopting repository: `.github/scripts/release.sh` refuses to run once `release-please-config.json` exists. The changelog is generated; edit the release PR's changelog when its wording needs a change, and do not edit `CHANGELOG.md` in feature PRs. Run `python3 -m unittest discover -s release -p 'test_*.py'` for the tests.
+
+### Conventional PR titles
+
+[`pr-title.yml`](.github/workflows/pr-title.yml) fails a pull request whose title is not a conventional commit subject (`feat:`, `fix:`, `feat!:`, optional scope; types from the `types` input, subject not starting uppercase). It is the check that makes squash merges safe for release-please: the PR title becomes the commit on `main`, hence the version bump. Use the [caller example](examples/pr-title.yml) as a workflow of its own (the `edited` trigger must not rerun the tests) and require the check `<caller job> / check` (`pr-title / check` in the example) in the branch ruleset. The caller must grant `pull-requests: read`.
+
+### Auto-merging release PRs
+
+With `auto-merge: true`, `release-please.yml` arms squash auto-merge on every open release PR (label `autorelease: pending`) through [`release/arm-release-pr-auto-merge.py`](release/arm-release-pr-auto-merge.py): the commit title is the PR title and the head commit is pinned, so a later push disarms it until the next run re-arms it. The release PR then merges as soon as the required checks pass, and the release is tagged and published **without human review**. Prerequisites in the adopting repository: `allow_auto_merge`, no required review, squash merges with `PR_TITLE` as the commit title, and the `pr-title` check required (all enforced by `github-config` for repositories with `release_pr: true`). Activate `auto-merge` only after those are in place. A PR that is already clean when armed is left for the next run instead of being merged without checks.
