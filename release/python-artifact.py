@@ -4,6 +4,7 @@
 import argparse
 from email.parser import BytesParser
 import hashlib
+from http.client import HTTPException
 import json
 import logging
 import os
@@ -11,11 +12,13 @@ from pathlib import Path
 import re
 import runpy
 import shutil
+import ssl
 import sys
 import tarfile
-from urllib.error import HTTPError
+import time
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 import zipfile
 
 
@@ -111,28 +114,60 @@ def distributions(package, version, directory):
     return {'package': name, 'version': version, 'files': hashes}
 
 
+# PEP 691 JSON flavour of the Simple index: the page pip and uv resolve from.
+SIMPLE_ACCEPT = 'application/vnd.pypi.simple.v1+json'
+# The Simple index is served with `max-age=600`, so a reader can see a stale page for up to
+# 600 s after an upload; the default wait adds a 60 s margin.
+DEFAULT_WAIT_SECONDS = 660
+MAX_POLL_DELAY = 30
+
+
+def file_version(filename, package):
+    """Return the version of a wheel or sdist of `package`, or None for anything else."""
+    if filename.endswith('.whl'):
+        parts = filename[:-4].split('-')
+        if len(parts) in (5, 6) and canonical_name(parts[0]) == package:
+            return parts[1]
+    elif filename.endswith('.tar.gz'):
+        project, separator, version = filename[:-7].rpartition('-')
+        if separator and canonical_name(project) == package:
+            return version
+    return None
+
+
 def registry_files(package, version, opener=urlopen, registry='pypi'):
-    url = f'{registry_url(registry)}/pypi/{quote(package, safe="")}/{quote(version, safe="")}/json'
+    # Read the project's Simple page, as installers do: it is purged on upload. The per-version
+    # JSON URL is not: `prepare` caches a 404 there that outlives the upload.
+    url = f'{registry_url(registry)}/simple/{quote(package, safe="")}/'
     try:
-        with opener(url, timeout=30) as response:
-            metadata = json.load(response)
+        with opener(Request(url, headers={'Accept': SIMPLE_ACCEPT}), timeout=30) as response:
+            page = json.load(response)
     except HTTPError as error:
         error.close()
         if error.code == 404:
             return {}
         raise
-    if canonical_name(metadata['info']['name']) != package or metadata['info']['version'] != version:
-        raise ValueError('PyPI response differs from the intended package/version')
-    urls = metadata['urls']
-    if not isinstance(urls, list):
+    meta = page['meta']['api-version']
+    if not isinstance(meta, str) or meta.split('.')[0] != '1':
+        raise ValueError('Unsupported PyPI Simple API version')
+    if canonical_name(page['name']) != package:
+        raise ValueError('PyPI response differs from the intended package')
+    files = page['files']
+    if not isinstance(files, list):
         raise ValueError('Invalid PyPI file list')
+    names = set()
     result = {}
-    for item in urls:
+    for item in files:
         filename = item['filename']
-        digest = item['digests']['sha256']
-        if (not isinstance(filename, str) or filename in result or item['yanked'] is not False
-                or not isinstance(digest, str) or not re.fullmatch(r'[0-9a-f]{64}', digest)):
-            raise ValueError('Invalid, duplicate or yanked PyPI file')
+        if not isinstance(filename, str) or filename in names:
+            raise ValueError('Invalid or duplicate PyPI file')
+        names.add(filename)
+        if file_version(filename, package) != version:
+            continue
+        digest = item['hashes']['sha256']
+        if item.get('yanked', False) is not False or not isinstance(digest, str) \
+                or not re.fullmatch(r'[0-9a-f]{64}', digest):
+            raise ValueError('Invalid or yanked PyPI file')
         result[filename] = digest
     return result
 
@@ -159,6 +194,37 @@ def prepare(package, version, directory, pending, opener=urlopen, registry='pypi
     return bool(missing)
 
 
+def retryable(error):
+    if isinstance(error, HTTPError):
+        return error.code == 429 or error.code >= 500
+    return isinstance(error, (URLError, TimeoutError, ConnectionError, ssl.SSLError, HTTPException))
+
+
+def verify(package, version, directory, opener=urlopen, registry='pypi',
+           wait_seconds=DEFAULT_WAIT_SECONDS, sleep=time.sleep, clock=time.monotonic):
+    registry_url(registry)
+    manifest = distributions(package, version, directory)
+    start = clock()
+    delay = 5
+    while True:
+        try:
+            missing = missing_files(manifest, registry_files(manifest['package'], version, opener, registry))
+            if not missing:
+                return
+            reason = f'missing {", ".join(missing)}'
+        except (OSError, HTTPException) as error:
+            # A digest mismatch or a malformed page (ValueError, KeyError, TypeError) fails at once.
+            if not retryable(error):
+                raise
+            reason = f'registry error: {error}'
+        remaining = wait_seconds - (clock() - start)
+        if remaining <= 0:
+            raise ValueError(f'The registry does not yet contain every intended distribution ({reason})')
+        logging.info('%s; retrying in %ss (%ss left)', reason, min(delay, remaining), round(remaining))
+        sleep(min(delay, remaining))
+        delay = min(delay * 2, MAX_POLL_DELAY)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['manifest', 'prepare', 'verify'])
@@ -167,6 +233,7 @@ def main():
     parser.add_argument('directory', type=Path)
     parser.add_argument('pending', type=Path, nargs='?')
     parser.add_argument('--registry', default='pypi')
+    parser.add_argument('--wait-seconds', type=int, default=DEFAULT_WAIT_SECONDS)
     args = parser.parse_args()
     if args.command == 'manifest':
         manifest = distributions(args.package, args.version, args.directory)
@@ -179,11 +246,10 @@ def main():
         with open(output, 'a', encoding='utf-8') as stream:
             stream.write(f'upload-needed={str(needed).lower()}\n')
     else:
-        registry_url(args.registry)
-        manifest = distributions(args.package, args.version, args.directory)
-        if missing_files(manifest, registry_files(manifest['package'], args.version, registry=args.registry)):
-            raise ValueError('The registry does not yet contain every intended distribution')
-
+        if args.wait_seconds < 0:
+            raise ValueError('--wait-seconds must not be negative')
+        verify(args.package, args.version, args.directory, registry=args.registry,
+               wait_seconds=args.wait_seconds)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(message)s')

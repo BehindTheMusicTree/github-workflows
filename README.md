@@ -91,16 +91,23 @@ tag-graph ─► build-graph ─► publish-graph ─► verify-public-dependenc
 final `verify` step, each with `--registry "$REGISTRY"` taken from `build-graph`'s
 `registry` output. The example is the reference; this README does not copy it.
 
-The retry helper queries the [PyPI version JSON API](https://docs.pypi.org/api/json/) of
-the selected registry (`https://pypi.org` or `https://test.pypi.org`; the helper accepts
+The retry helper reads the project's [Simple index](https://docs.pypi.org/api/json/) page
+(PEP 691 JSON, the page pip and uv resolve from) of the selected registry (`https://pypi.org` or `https://test.pypi.org`; the helper accepts
 only these two names, never a URL). It compares every remote filename and SHA-256 digest
 against the intended wheel/sdist. Identical complete releases skip uploading; partial
 releases stage only missing files. Unexpected files, changed hashes, yanked files,
-malformed responses and network/API errors fail; only HTTP 404 means absence. All existing
+malformed responses and network/API errors fail; only HTTP 404 means absence in `prepare`. All existing
 files are checked before any file is staged. `pending` must not already exist. The manifest
 check separately verifies downloaded artifacts before querying the registry. The final
-check requires the complete matching release; registry visibility delays may fail it
-safely and require a rerun. For TestPyPI, publish with
+check requires the complete matching release and waits for it (`verify --wait-seconds`,
+default 660, `0` reads once): it retries only a strict subset of the files, a 404 on the
+project, HTTP 429/5xx and network errors; a diverging digest, a foreign or yanked file, a
+malformed page or any other 4xx fails at once. `prepare` never retries. The helper reads
+the Simple page, not the per-version JSON URL, because `prepare` reads a version that does
+not exist yet and the CDN caches that 404 past the upload, whereas the project page exists
+from the first release. Two caches are involved: the per-version 404 (minutes) and the
+Simple index (`max-age=600`, which an upload purges only on a best-effort basis), hence the
+660 s budget and a worst case of about 11 minutes without any rerun. For TestPyPI, publish with
 `repository-url: https://test.pypi.org/legacy/` in the publish action and register the
 Trusted Publisher on test.pypi.org.
 
@@ -119,13 +126,26 @@ conditions explicitly:
   after the verification because `release-tag.yml` publishes the GitHub Release as soon as
   it creates the tag; a root tag therefore never exists before its public dependencies
   are installable.
-- `release-please`: `needs: [tag-graph, tag-root]` with the default condition. A failure
-  upstream blocks the release PR reconciliation until it is rerun.
+- `release-please`: `needs: [tag-graph, tag-root]` and
+  `!cancelled() && needs.tag-graph.result == 'success' && needs.tag-root.result == 'success'`.
+  The default `success()` also looks at transitive ancestors, so a `publish-graph` skipped by
+  design would skip it. A real failure upstream still blocks the release PR reconciliation
+  until it is rerun; a slow `verify-public-dependency` delays it too.
+- The `verify-public-dependency` install step pins `example-graph==<version in
+  graph/pyproject.toml>` and retries until 660 s (30 s sleeps). Without the exact pin, pip
+  succeeds by installing an older graph that the root range allows while the Simple index
+  page is stale, and the root tag would be created on an unpublished dependency. A root-only
+  release finds the pinned version already published and passes at the first attempt.
 
 Do not add a global concurrency group: cancelling or queueing runs could drop a pending
-release bump. Recover with **Re-run failed jobs**: it reruns `publish-graph` and its
-dependents with the same `job.workflow_sha`, and `prepare` only republishes files that
-are still missing. Rebuilding must reproduce the original bytes, so rerun the failed job
+release bump. A registry visibility delay no longer needs a rerun (see the waits above);
+**Re-run failed jobs** is only for a real failure. It reruns `publish-graph` and its
+dependents with the same `job.workflow_sha`, and `prepare` uploads the files it does not
+see. PyPI rejects a re-upload of an existing filename, so rerun only after the Simple page has
+had time to refresh (about 10 minutes after the upload); an earlier rerun can stage a file
+that is already published and fail the upload step. A rerun
+reuses the old workflow SHA: close and reopen a release PR to run `validate.yml` with the
+current workflow. Rebuilding must reproduce the original bytes, so rerun the failed job
 rather than the whole run; a digest mismatch requires investigation. Do not enable blind
 `skip-existing` or move the tag. Concurrent upload collisions fail safely; retry after
 checking the winning upload.
@@ -163,6 +183,18 @@ GitHub Release creation has one owner per tag. For a package with `github_releas
 verification it depends on, as `tag-root` is above. This workflow never creates a tag or
 GitHub Release itself. The standalone `release-github.yml` is for GitHub-only root
 policies and refuses package outputs.
+
+Practical notes for a workspace whose root depends on a published member:
+
+- `uv lock --check` does not compare a workspace member's version with the specifier its
+  dependents declare, so a member bump can leave the root range silently. Add a check to
+  the PR validation, for example `uv run --no-project --with packaging python -` comparing
+  `Requirement(...).specifier.contains(member_version)` for the member's entry in the root
+  `dependencies`.
+- The root range must therefore be widened in the same PR as every minor bump of the
+  member (a `fix:` change touching the root manifest and `uv.lock`).
+- A `docs:` commit is included in the changelog by release-please and opens a release PR;
+  use `chore:` for a change that must not release.
 
 ### Agent drift
 

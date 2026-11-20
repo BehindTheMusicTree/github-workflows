@@ -1,8 +1,11 @@
 import hashlib
 import importlib.util
 import io
+from http.client import IncompleteRead
 import json
 import os
+import shutil
+import ssl
 import subprocess
 import sys
 from pathlib import Path
@@ -40,16 +43,45 @@ class PythonArtifactTests(unittest.TestCase):
             member.size = len(metadata)
             archive.addfile(member, io.BytesIO(metadata))
 
-    def response(self, files=None, **changes):
-        data = {'info': {'name': 'example-pkg', 'version': '1.2.3'}, 'urls': [
-            {'filename': filename, 'digests': {'sha256': digest}, 'yanked': False}
-            for filename, digest in (self.manifest['files'] if files is None else files).items()]}
+    def page(self, manifest_files=None, **changes):
+        data = {'meta': {'api-version': '1.1'}, 'name': 'example-pkg', 'files': [
+            {'filename': filename, 'hashes': {'sha256': digest}, 'yanked': False}
+            for filename, digest in (self.manifest['files'] if manifest_files is None else manifest_files).items()]}
         data.update(changes)
-        def opener(url, timeout):
-            self.assertEqual(url, 'https://pypi.org/pypi/example-pkg/1.2.3/json')
+        return data
+
+    def response(self, manifest_files=None, **changes):
+        data = self.page(manifest_files, **changes)
+        def opener(request, timeout):
+            self.assertEqual(request.full_url, 'https://pypi.org/simple/example-pkg/')
+            self.assertEqual(request.get_header('Accept'), 'application/vnd.pypi.simple.v1+json')
             self.assertEqual(timeout, 30)
             return io.BytesIO(json.dumps(data).encode())
         return opener
+
+    def sequence(self, *outcomes):
+        """Opener returning (or raising) each outcome in turn; `calls` counts the reads."""
+        calls = []
+        def opener(request, timeout):
+            calls.append(request.full_url)
+            outcome = outcomes[min(len(calls), len(outcomes)) - 1]
+            if isinstance(outcome, Exception):
+                raise outcome
+            return io.BytesIO(json.dumps(outcome).encode())
+        opener.calls = calls
+        return opener
+
+    def attempt_verify(self, opener, wait_seconds=660):
+        now = [0.0]
+        sleeps = []
+        def sleep(seconds):
+            sleeps.append(seconds)
+            now[0] += seconds
+        try:
+            module.verify('example-pkg', '1.2.3', self.dist, opener, 'pypi', wait_seconds, sleep, lambda: now[0])
+        except Exception as error:
+            return sleeps, error
+        return sleeps, None
 
     @staticmethod
     def failing(error):
@@ -62,11 +94,11 @@ class PythonArtifactTests(unittest.TestCase):
 
     def test_testpypi_uses_its_own_api_url(self):
         urls = []
-        def opener(url, timeout):
-            urls.append(url)
-            raise HTTPError(url, 404, 'missing', {}, None)
+        def opener(request, timeout):
+            urls.append(request.full_url)
+            raise HTTPError(request.full_url, 404, 'missing', {}, None)
         self.assertEqual(module.registry_files('example-pkg', '1.2.3', opener, 'testpypi'), {})
-        self.assertEqual(urls, ['https://test.pypi.org/pypi/example-pkg/1.2.3/json'])
+        self.assertEqual(urls, ['https://test.pypi.org/simple/example-pkg/'])
 
     def test_unknown_registry_fails_before_any_lookup(self):
         for registry in ['', 'PyPI', 'https://evil.example', 'test']:
@@ -97,7 +129,7 @@ class PythonArtifactTests(unittest.TestCase):
         self.assertEqual(staged[0].read_bytes(), self.sdist.read_bytes())
 
     def test_mismatched_hash_or_filename_never_stages_anything(self):
-        for files in ({self.wheel.name: '0' * 64}, {'unexpected.whl': '0' * 64}):
+        for files in ({self.wheel.name: '0' * 64}, {'example_pkg-1.2.3-py2-none-any.whl': '0' * 64}):
             with self.subTest(files=files), self.assertRaises(ValueError):
                 self.prepare(self.response(files))
             self.assertFalse((self.root / 'pending').exists())
@@ -109,16 +141,108 @@ class PythonArtifactTests(unittest.TestCase):
             self.assertFalse((self.root / 'pending').exists())
 
     def test_malformed_responses_fail_closed(self):
-        valid_file = {'filename': self.wheel.name, 'digests': {'sha256': '0' * 64}, 'yanked': False}
-        for changes in ({'info': {'name': 'other', 'version': '1.2.3'}},
-                        {'info': {'name': 'example-pkg', 'version': '9.9.9'}},
-                        {'urls': None}, {'urls': [{}]}, {'urls': [valid_file, valid_file]},
-                        {'urls': [{**valid_file, 'yanked': True}]},
-                        {'urls': [{**valid_file, 'digests': {'sha256': 'invalid'}}]}):
+        valid_file = {'filename': self.wheel.name, 'hashes': {'sha256': '0' * 64}, 'yanked': False}
+        for changes in ({'name': 'other'}, {'meta': {'api-version': '2.0'}}, {'meta': {}}, {'meta': {'api-version': 1}},
+                        {'files': None}, {'files': [{}]}, {'files': [valid_file, valid_file]},
+                        {'files': [{**valid_file, 'yanked': True}]},
+                        {'files': [{**valid_file, 'yanked': 'reason'}]},
+                        {'files': [{**valid_file, 'hashes': {'sha256': 'invalid'}}]},
+                        {'files': [{**valid_file, 'hashes': {}}]}):
             with self.subTest(changes=changes), self.assertRaises((ValueError, TypeError, KeyError)):
                 self.prepare(self.response(**changes))
+            self.assertFalse((self.root / 'pending').exists())
         with self.assertRaises(ValueError):
             self.prepare(lambda *args, **kwargs: io.BytesIO(b'not JSON'))
+
+    def test_other_versions_and_other_files_are_ignored(self):
+        files = self.page()['files'] + [
+            {'filename': 'example_pkg-1.2.2-py3-none-any.whl', 'hashes': {'sha256': '1' * 64}, 'yanked': True},
+            {'filename': 'example-pkg-1.2.4.tar.gz', 'hashes': {'sha256': '2' * 64}, 'yanked': False},
+            {'filename': 'example_pkg-1.2.3.zip', 'hashes': {'sha256': '3' * 64}, 'yanked': False}]
+        self.assertFalse(self.prepare(self.response(files=files)))
+
+    def test_file_of_this_version_outside_the_manifest_fails(self):
+        files = self.page()['files'] + [
+            {'filename': 'example_pkg-1.2.3-py2-none-any.whl', 'hashes': {'sha256': '1' * 64}, 'yanked': False}]
+        with self.assertRaisesRegex(ValueError, 'differs'):
+            self.prepare(self.response(files=files))
+
+    def test_verify_succeeds_on_first_read_without_sleeping(self):
+        opener = self.sequence(self.page())
+        self.assertEqual(self.attempt_verify(opener), ([], None))
+        self.assertEqual(len(opener.calls), 1)
+
+    def test_verify_waits_for_the_index_to_catch_up(self):
+        wheel_only = {self.wheel.name: self.manifest['files'][self.wheel.name]}
+        opener = self.sequence(HTTPError('url', 404, 'missing', {}, None), self.page(wheel_only), self.page())
+        sleeps, error = self.attempt_verify(opener)
+        self.assertIsNone(error)
+        self.assertEqual(sleeps, [5, 10])
+        self.assertEqual(len(opener.calls), 3)
+
+    def test_verify_gives_up_at_the_deadline(self):
+        opener = self.sequence(self.page({}))
+        sleeps, error = self.attempt_verify(opener)
+        self.assertIsInstance(error, ValueError)
+        self.assertIn('does not yet contain every intended distribution', str(error))
+        self.assertEqual(sleeps[:4], [5, 10, 20, 30])
+        self.assertEqual(sum(sleeps), 660)
+        self.assertEqual(len(opener.calls), len(sleeps) + 1)
+
+    def test_verify_with_zero_wait_reads_once(self):
+        opener = self.sequence(self.page({}))
+        sleeps, error = self.attempt_verify(opener, 0)
+        self.assertIsInstance(error, ValueError)
+        self.assertEqual((sleeps, len(opener.calls)), ([], 1))
+
+    def test_verify_retries_transient_registry_errors(self):
+        for error in [HTTPError('url', code, 'failure', {}, None) for code in (429, 500, 503)] + [
+                URLError('offline'), TimeoutError('slow'), ConnectionResetError('reset'),
+                ssl.SSLError('handshake'), IncompleteRead(b'{')]:
+            with self.subTest(error=error):
+                opener = self.sequence(error, self.page())
+                sleeps, raised = self.attempt_verify(opener)
+                self.assertIsNone(raised)
+                self.assertEqual((sleeps, len(opener.calls)), ([5], 2))
+
+    def test_verify_reports_a_persistent_transient_error_at_the_deadline(self):
+        sleeps, error = self.attempt_verify(self.sequence(HTTPError('url', 503, 'down', {}, None)), 20)
+        self.assertIsInstance(error, ValueError)
+        self.assertIn('503', str(error))
+        self.assertEqual(sum(sleeps), 20)
+
+    def test_verify_fails_at_once_on_other_client_errors(self):
+        for code in (400, 401, 403, 410):
+            with self.subTest(code=code):
+                opener = self.sequence(HTTPError('url', code, 'failure', {}, None), self.page())
+                sleeps, error = self.attempt_verify(opener)
+                self.assertIsInstance(error, HTTPError)
+                self.assertEqual((sleeps, len(opener.calls)), ([], 1))
+
+    def test_verify_fails_at_once_on_a_diverging_digest_or_malformed_page(self):
+        wheel_only = {self.wheel.name: self.manifest['files'][self.wheel.name]}
+        for outcome in ({self.wheel.name: '0' * 64}, {'example_pkg-1.2.3-py2-none-any.whl': '0' * 64}):
+            with self.subTest(outcome=outcome):
+                opener = self.sequence(self.page(wheel_only), self.page(outcome))
+                sleeps, error = self.attempt_verify(opener)
+                self.assertIsInstance(error, ValueError)
+                self.assertEqual((sleeps, len(opener.calls)), ([5], 2))
+        for page in (self.page(name='other'), self.page(meta={'api-version': '2.0'}), {'files': []}):
+            with self.subTest(page=page):
+                opener = self.sequence(page)
+                sleeps, error = self.attempt_verify(opener)
+                self.assertIsInstance(error, (ValueError, KeyError))
+                self.assertEqual((sleeps, len(opener.calls)), ([], 1))
+
+    def test_prepare_never_retries(self):
+        for opener in (self.sequence(self.page({}), self.page()), self.sequence(HTTPError('url', 503, 'down', {}, None))):
+            with self.subTest(opener=opener):
+                try:
+                    self.prepare(opener)
+                except OSError:
+                    pass
+                self.assertEqual(len(opener.calls), 1)
+                shutil.rmtree(self.root / 'pending', ignore_errors=True)
 
     def test_downloaded_artifact_mismatch_fails_before_registry_lookup(self):
         self.write_archives(name='example-pkg')

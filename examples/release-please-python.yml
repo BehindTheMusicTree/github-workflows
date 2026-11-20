@@ -12,7 +12,8 @@ on:
 permissions:
   contents: read
 # No concurrency group: cancelling or queueing runs could drop a pending release bump.
-# Recover from a failed job with "Re-run failed jobs"; prepare only uploads the files still missing.
+# Recover from a failed job with "Re-run failed jobs"; prepare only uploads the files still missing, and verify
+# waits up to 660 s for the registry, so a re-run is only needed after a real failure.
 jobs:
   tag-graph:
     permissions:
@@ -91,13 +92,34 @@ jobs:
           python-version: '3.12'
       - name: Install the root from public indexes only
         run: |
-          # The index can lag behind the upload: retry a few times before failing.
-          for attempt in 1 2 3 4 5 6; do
-            python3 -m pip install --no-cache-dir . && exit 0
-            echo "Public dependencies not yet installable (attempt $attempt/6)" >&2
-            sleep 10
+          # The installer's Simple index page is cached for up to 600 s after an upload, and pip happily
+          # installs an older graph that the root's range still allows. Pin the exact version just
+          # published (same source as the check below) so a stale page fails, then retry up to 660 s.
+          GRAPH_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('graph/pyproject.toml', 'rb'))['project']['version'])")
+          deadline=$((SECONDS + 660))
+          attempt=1
+          while true; do
+            python3 -m pip install --no-cache-dir . "example-graph==$GRAPH_VERSION" && exit 0
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "example-graph $GRAPH_VERSION is still not installable after 660 s" >&2
+              exit 1
+            fi
+            echo "example-graph $GRAPH_VERSION not yet installable (attempt $attempt, ${SECONDS}s elapsed)" >&2
+            attempt=$((attempt + 1))
+            sleep 30
           done
-          exit 1
+      - name: Require the intended graph package version
+        # Explicit invariant: fails with a clear message if the exact pin above is ever removed.
+        run: |
+          python3 - <<'PY'
+          from importlib.metadata import version
+          from pathlib import Path
+          import tomllib
+
+          expected = tomllib.loads(Path('graph/pyproject.toml').read_text())['project']['version']
+          if version('example-graph') != expected:
+              raise SystemExit('Publish the intended graph package version before releasing the root')
+          PY
   tag-root:
     needs: verify-public-dependency
     if: ${{ !cancelled() && needs.verify-public-dependency.result == 'success' }}
@@ -111,8 +133,11 @@ jobs:
     secrets:
       release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
   release-please:
-    # Default success condition: any failure upstream blocks the release PR reconciliation until rerun.
+    # Explicit condition: the default success() also looks at transitive ancestors, so a skipped publish-graph
+    # (no graph release in this push) would skip this job. tag-root success implies verify-public-dependency
+    # success, so a real upstream failure still blocks the release PR reconciliation until rerun.
     needs: [tag-graph, tag-root]
+    if: ${{ !cancelled() && needs.tag-graph.result == 'success' && needs.tag-root.result == 'success' }}
     uses: BehindTheMusicTree/github-workflows/.github/workflows/release-please.yml@REPLACE_WITH_MERGED_COMMIT_SHA
     with:
       app-id: ${{ vars.RELEASE_PR_APP_ID }}
