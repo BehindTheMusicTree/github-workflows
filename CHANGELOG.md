@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-11-20
+
+
 ### Added
 
 - **Published-package example**: `examples/release-please-python.yml` runs tag, build, publish, public-dependency verification and release-please in one `main` push workflow.
