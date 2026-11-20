@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.2.0] - 2026-11-20
+
+
 ### Added
 
 - **`pr-title.yml`**: reusable check that a PR title is a conventional commit subject, so that squash merges give release-please valid commits (`examples/pr-title.yml`).
