@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- The release rule states that the release PR of a `release_pr` repository is auto-merged by CI when its `release-please` job sets `auto-merge: true`: agents do not merge it themselves, and never merge it directly if auto-merge is refused without the user's agreement.
+
 ## [6.2.0] - 2026-11-20
 
 
