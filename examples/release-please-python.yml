@@ -144,5 +144,7 @@ jobs:
       release-policies: |
         .github/release-policy.json
         .github/graph-release-policy.json
+      # Publishes without human review once the required checks pass; see README "Auto-merging release PRs".
+      # auto-merge: true
     secrets:
       release-pr-app-private-key: ${{ secrets.RELEASE_PR_APP_PRIVATE_KEY }}

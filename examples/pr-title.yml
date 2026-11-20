@@ -1,0 +1,15 @@
+# Caller for the reusable PR title check. Keep it in its own workflow: the `edited` trigger
+# must not rerun the test suite. Require the check `pr-title / check` in the branch ruleset.
+name: PR title
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  pr-title:
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/pr-title.yml@<merged-commit-sha>

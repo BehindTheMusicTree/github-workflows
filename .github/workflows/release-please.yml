@@ -23,6 +23,11 @@ on:
         type: string
         required: false
         default: .release-please-manifest.json
+      auto-merge:
+        description: Arm squash auto-merge on release PRs, which then publish once the required checks pass, with no human review (needs allow_auto_merge and squash merges using the PR title)
+        type: boolean
+        required: false
+        default: false
     secrets:
       release-pr-app-private-key:
         required: true
@@ -101,3 +106,10 @@ jobs:
           config-file: ${{ inputs.config-file }}
           manifest-file: ${{ inputs.manifest-file }}
           skip-github-release: true
+      # Re-armed on every run: pushing to a release PR disarms auto-merge, and the head is pinned.
+      - name: Arm auto-merge on release PRs
+        if: inputs.auto-merge
+        working-directory: caller
+        env:
+          RELEASE_PR_APP_TOKEN: ${{ steps.app.outputs.token }}
+        run: python3 ../foundation/release/arm-release-pr-auto-merge.py

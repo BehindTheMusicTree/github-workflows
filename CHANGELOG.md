@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`pr-title.yml`**: reusable check that a PR title is a conventional commit subject, so that squash merges give release-please valid commits (`examples/pr-title.yml`).
+- **`release-please.yml` input `auto-merge`** (default `false`): arms squash auto-merge on release PRs with the PR title as commit title and a pinned head (`release/arm-release-pr-auto-merge.py`).
+
 ### Documentation
 
 - README: mark the tag-push mode with `release-github.yml` and local `release.sh` as deprecated, listing the callers that still use them; fix the statement that package publishers stay tag-triggered.
