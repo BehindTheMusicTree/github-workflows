@@ -42,104 +42,93 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 [`publish-python.yml`](.github/workflows/publish-python.yml) builds exactly one wheel and
 one `.tar.gz` sdist from the caller's selected package directory (the repository root by
-default), checks their metadata, and uploads
-them with a SHA-256 manifest. It requires a tag push whose dereferenced commit is on
-`origin/main`, a valid selected release policy (default `.github/release-policy.json`),
-matching canonical version/mirrors,
-and populated release notes. Put the exact `package-name` in the policy's
-`outputs.packages` array. Only stable `X.Y.Z` versions are supported.
+default), checks their metadata, and uploads them with a SHA-256 manifest. It runs inside
+the release run of a **push to `main`**, after a `release-tag.yml` job of the same run has
+created the package's tag: pass that job's `tag` output as `release-tag`. The tag's
+dereferenced commit must be the checked-out commit and descend from `origin/main`, the
+selected release policy (default `.github/release-policy.json`) must be valid with matching
+canonical version/mirrors and populated release notes. Put the exact `package-name` in the
+policy's `outputs.packages` array. Only stable `X.Y.Z` versions are supported.
 
 | Input | Required | Default | Purpose |
 | --- | --- | --- | --- |
+| `release-tag` | Yes | — | Tag output of a `release-tag.yml` job in the same run; an empty value fails |
+| `registry` | No | `pypi` | `pypi` or `testpypi`; any other value fails before the build |
 | `package-name` | Yes | — | Intended PyPI project name; must match distribution metadata and filenames |
 | `package-directory` | No | `.` | Existing repository-relative build directory; symlinks and traversal are rejected |
 | `release-policy-path` | No | `.github/release-policy.json` | Repository-relative policy file; paths inside the policy are also relative to the repository root |
 | `python-version` | No | `3.12` | Build interpreter, Python 3.11+ required |
 | `artifact-name` | No | `python-distributions` | Artifact name, unique per package in a run |
 
-Outputs are `version`, `artifact-name`, and `foundation-sha` (the exact helper commit).
-No API token or release App key is used. The build job has only `contents: read`.
+Outputs are `version`, `artifact-name`, `registry` and `foundation-sha` (the exact helper
+commit). No API token or release App key is used. The build job has only `contents: read`.
+The tag is fetched with a bounded retry, since a tag just created through the API can take
+a moment to be served by git.
 
 PyPI Trusted Publishing must run in the caller's top-level workflow, outside the reusable
 workflow ([PyPA limitation](https://github.com/pypa/gh-action-pypi-publish#trusted-publishing)).
-Configure the caller repository, its existing workflow filename, and the `pypi` environment
-as the [PyPI Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/).
-Keep that workflow filename when adopting this helper so its OIDC identity is retained.
-Grant `id-token: write` only to the publication job. Add this to that caller workflow,
-replacing `REPLACE_WITH_MERGED_SHA` with the full merged foundation commit and
-`example-pkg` with your project:
+Configure the caller repository, the filename of the caller workflow that contains the
+publication job, and the `pypi` environment as the
+[PyPI Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/).
+Restrict the `pypi` environment's deployment policy to the `main` branch: publication now
+happens on a push to `main`, not on a tag push, so a tag-pattern policy no longer matches.
+Grant `id-token: write` only to the publication job.
 
-```yaml
-name: Publish Python
-on:
-  push:
-    tags: ['v*']
-permissions:
-  contents: read
-concurrency:
-  group: publish-python-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-jobs:
-  build:
-    uses: BehindTheMusicTree/github-workflows/.github/workflows/publish-python.yml@REPLACE_WITH_MERGED_SHA
-    with:
-      package-name: example-pkg
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/example-pkg
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          repository: BehindTheMusicTree/github-workflows
-          ref: ${{ needs.build.outputs.foundation-sha }}
-          path: foundation
-          persist-credentials: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build.outputs.artifact-name }}
-          path: dist
-      - name: Verify downloaded files and check PyPI retries
-        id: retry
-        env:
-          VERSION: ${{ needs.build.outputs.version }}
-        run: python3 foundation/release/python-artifact.py prepare example-pkg "$VERSION" dist pending
-      - name: Publish missing distributions with Trusted Publishing
-        if: steps.retry.outputs.upload-needed == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: pending/
-          skip-existing: false
-      - name: Verify the complete published file set
-        env:
-          VERSION: ${{ needs.build.outputs.version }}
-        run: python3 foundation/release/python-artifact.py verify example-pkg "$VERSION" dist
+**Migrating from tag-triggered publication (v6.0.0, breaking).** The caller workflow no
+longer triggers on tags and has no `select` job. Move build and publication into the
+release workflow (below), add a Trusted Publisher for its filename and the `pypi`
+environment while keeping the old one, switch the environment policy to `main`, merge,
+then remove the old Trusted Publisher.
+
+The complete caller is [`examples/release-please-python.yml`](examples/release-please-python.yml):
+
+```
+tag-graph ─► build-graph ─► publish-graph ─► verify-public-dependency ─► tag-root ─► release-please
 ```
 
-The retry helper queries the [PyPI version JSON API](https://docs.pypi.org/api/json/).
-It compares every remote filename and SHA-256 digest against the intended wheel/sdist.
-Identical complete releases skip uploading; partial releases stage only missing files.
-Unexpected files, changed hashes, yanked files, malformed responses and network/API
-errors fail; only HTTP 404 means absence. All existing files are checked before any
-file is staged. `pending` must not already exist. The manifest check separately verifies
-downloaded artifacts before querying PyPI. The final check requires the complete matching
-release; registry visibility delays may fail it safely and require a rerun.
+`publish-graph` is the top-level job holding `id-token: write`; it runs the helper's
+`prepare` step, the `pypa/gh-action-pypi-publish` action for missing files only, and the
+final `verify` step, each with `--registry "$REGISTRY"` taken from `build-graph`'s
+`registry` output. The example is the reference; this README does not copy it.
 
-Rerun only the failed publication job to reuse the original build artifact. Rebuilding
-must reproduce its bytes: timestamps or changed build dependencies may otherwise cause
-a digest mismatch, which requires investigation. Do not enable blind `skip-existing` or
-move the tag. Concurrent upload collisions fail safely; retry after checking the winning
-upload. For multiple packages, use distinct artifact names and a separate caller job for
-each upload. Keep a single GitHub Release owner that depends on all publication jobs;
-this workflow never creates a tag or GitHub Release.
+The retry helper queries the [PyPI version JSON API](https://docs.pypi.org/api/json/) of
+the selected registry (`https://pypi.org` or `https://test.pypi.org`; the helper accepts
+only these two names, never a URL). It compares every remote filename and SHA-256 digest
+against the intended wheel/sdist. Identical complete releases skip uploading; partial
+releases stage only missing files. Unexpected files, changed hashes, yanked files,
+malformed responses and network/API errors fail; only HTTP 404 means absence. All existing
+files are checked before any file is staged. `pending` must not already exist. The manifest
+check separately verifies downloaded artifacts before querying the registry. The final
+check requires the complete matching release; registry visibility delays may fail it
+safely and require a rerun. For TestPyPI, publish with
+`repository-url: https://test.pypi.org/legacy/` in the publish action and register the
+Trusted Publisher on test.pypi.org.
+
+#### Conditions between jobs
+
+A job whose `needs` contains a skipped job is skipped too, so the caller states its
+conditions explicitly:
+
+- `build-graph` and `publish-graph`: `if: needs.tag-graph.outputs.tag != ''` (successful
+  `needs` stay implicit). A push without a graph release skips both.
+- `verify-public-dependency`: `!cancelled() && needs.tag-graph.result == 'success' &&
+  (needs.tag-graph.outputs.tag == '' || needs.publish-graph.result == 'success')`. A
+  root-only release skips `publish-graph` by design, but a failed `build-graph` also
+  leaves `publish-graph` skipped, so the tag output, not `skipped`, tells the cases apart.
+- `tag-root`: `!cancelled() && needs.verify-public-dependency.result == 'success'`. It runs
+  after the verification because `release-tag.yml` publishes the GitHub Release as soon as
+  it creates the tag; a root tag therefore never exists before its public dependencies
+  are installable.
+- `release-please`: `needs: [tag-graph, tag-root]` with the default condition. A failure
+  upstream blocks the release PR reconciliation until it is rerun.
+
+Do not add a global concurrency group: cancelling or queueing runs could drop a pending
+release bump. Recover with **Re-run failed jobs**: it reruns `publish-graph` and its
+dependents with the same `job.workflow_sha`, and `prepare` only republishes files that
+are still missing. Rebuilding must reproduce the original bytes, so rerun the failed job
+rather than the whole run; a digest mismatch requires investigation. Do not enable blind
+`skip-existing` or move the tag. Concurrent upload collisions fail safely; retry after
+checking the winning upload.
 
 The helper is standard-library-only. Its tests also build fixture packages: install
 `build twine setuptools wheel`, then run
@@ -149,87 +138,31 @@ against its configured PyPI Trusted Publisher; local tests never perform uploads
 
 #### Two independently versioned packages
 
-For `packages/alpha` at `2.3.4` and `packages/beta` at `7.0.1`, use separate policies
-and tag prefixes. For example, `.github/alpha-release.json` contains:
+The example above already is the two-component case: the root (`v*`) and `graph/` (`graph-v*`)
+each have their own release policy, version source, changelog and tag prefix, and each
+`release-tag.yml` job takes its own `release-policy-path`. Repeat the pair
+`tag-<pkg>` / `build-<pkg>` / `publish-<pkg>` for every additional published package:
 
-```json
-{
-  "release_branch": "main",
-  "version": {"path": "packages/alpha/pyproject.toml", "format": "toml", "key": "project.version"},
-  "mirrors": [],
-  "tag_prefix": "alpha-v",
-  "changelog": "packages/alpha/CHANGELOG.md",
-  "outputs": {"github_release": true, "packages": ["alpha-pkg"]}
-}
-```
+- give each package its own policy listing its `package-name` in `outputs.packages`, and a
+  distinct `artifact-name`;
+- condition each `build-<pkg>` and `publish-<pkg>` on its own `needs.tag-<pkg>.outputs.tag`;
+- add every `publish-<pkg>` to the verification condition and to the `needs` of the job
+  that tags the dependent component;
+- register **every** PyPI project with the caller workflow filename and the `pypi`
+  environment.
 
-Create `.github/beta-release.json` with `beta` paths, `beta-v`, and `beta-pkg`.
-Each changelog must have nonempty notes for its own version. Keep all policy paths
-relative to the repository root, including when the policy file lives inside a package.
-The policies need not share a version source, mirrors, changelog or tag prefix.
-Distribution filenames and embedded metadata must match the selected policy version
-and `package-name`; building the wrong package fails before any upload.
+A bump of one package publishes only that package; a failed publication of one package
+can be rerun without changing another package's version or tag. Each changelog must have
+nonempty notes for its own version, and all policy paths stay relative to the repository
+root, including when the policy file lives inside a package. Distribution filenames and
+embedded metadata must match the selected policy version and `package-name`; building the
+wrong package fails before any upload.
 
-In the **same caller workflow file** as the Trusted Publishing job above, replace
-its tag filter and build job with the following selection and build jobs:
-
-```yaml
-on:
-  push:
-    tags: ['alpha-v*', 'beta-v*']
-jobs:
-  select:
-    runs-on: ubuntu-latest
-    outputs:
-      package: ${{ steps.package.outputs.package }}
-      directory: ${{ steps.package.outputs.directory }}
-      policy: ${{ steps.package.outputs.policy }}
-      artifact: ${{ steps.package.outputs.artifact }}
-    steps:
-      - id: package
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          case "$TAG" in
-            alpha-v*) package=alpha ;;
-            beta-v*) package=beta ;;
-            *) echo 'Unexpected package tag' >&2; exit 1 ;;
-          esac
-          {
-            echo "package=$package-pkg"
-            echo "directory=packages/$package"
-            echo "policy=.github/$package-release.json"
-            echo "artifact=$package-distributions"
-          } >> "$GITHUB_OUTPUT"
-  build:
-    needs: select
-    uses: BehindTheMusicTree/github-workflows/.github/workflows/publish-python.yml@REPLACE_WITH_MERGED_SHA
-    with:
-      package-name: ${{ needs.select.outputs.package }}
-      package-directory: ${{ needs.select.outputs.directory }}
-      release-policy-path: ${{ needs.select.outputs.policy }}
-      artifact-name: ${{ needs.select.outputs.artifact }}
-```
-
-Keep the caller's `publish` job, changing its `needs` to `[select, build]`. Use
-`https://pypi.org/p/${{ needs.select.outputs.package }}` for its environment URL, set
-`PACKAGE: ${{ needs.select.outputs.package }}` in the retry and final verification
-steps' environments, and replace the literal `example-pkg` in those commands with
-`"$PACKAGE"`. The artifact, version and foundation SHA still come from `needs.build.outputs`.
-Register **both** PyPI projects with this caller workflow filename and environment.
-An `alpha-v2.3.4` push validates/builds/publishes only alpha; `beta-v7.0.1` publishes
-only beta, even when both tags point to the same commit. A failed beta publication
-can be retried without changing alpha's version or tag.
-
-GitHub Release creation stays in the caller and has one owner per tag. Add its job
-**after** publication with `needs: [select, build, publish]`, using the default success
-condition. It must validate the selected policy and use that policy's versioned
-changelog section. If a tag requires additional publications (for example another
-registry), include **every** publication job in `needs` and create the GitHub Release
-only when all succeed, including final registry verification. Do not use `always()`
-to publish a release after a failure, or race an independent tag-triggered GitHub Release
-workflow against the upload jobs. The standalone `release-github.yml` is for GitHub-only
-root policies and refuses package outputs; retain the caller's package release owner.
+GitHub Release creation has one owner per tag. For a package with `github_release: true`,
+`release-tag.yml` publishes it after tagging, so put that tagging job after every
+verification it depends on, as `tag-root` is above. This workflow never creates a tag or
+GitHub Release itself. The standalone `release-github.yml` is for GitHub-only root
+policies and refuses package outputs.
 
 ### Agent drift
 
@@ -589,7 +522,7 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed history of changes, including ve
 
 ## Release validation and tagging
 
-The reusable [release-tag workflow](.github/workflows/release-tag.yml) validates a push to `main` and creates an annotated tag on that event's exact commit. It does not build packages, create GitHub Releases, or deploy. Existing tag-triggered publishers keep their permissions, OIDC identities and workflow filenames.
+The reusable [release-tag workflow](.github/workflows/release-tag.yml) validates a push to `main` and creates an annotated tag on that event's exact commit. It does not build packages, create GitHub Releases, or deploy. Publishers keep their own permissions; `publish-python.yml` runs in the same main-push run, after this workflow (see [Python publication](#python-publication)).
 
 An adopter commits `.github/release-policy.json` using the [schema](release/release-policy.schema.json) and [example policy](examples/release-policy.json). The contract declares one canonical version, all mirrors, a tag prefix, a changelog and expected publication outputs. JSON and TOML sources use dot-separated keys; text files contain a version. Versions must be stable SemVer without leading zeroes. The validator enforces repository-relative paths and rejects duplicate sources. The changelog must contain exactly one `## [VERSION]` section with content beyond headings and HTML comments. The heading may carry a compare link directly after the bracket (`## [1.2.0](https://…) (2026-11-19)`, the release-please format) or a free-text suffix. For a first release without a previous tag, release-please writes the bare form `## 1.2.0 (2026-11-19)`, which is accepted too.
 
@@ -655,7 +588,7 @@ Adopting:
 
 1. Commit `release-please-config.json` and `.release-please-manifest.json` ([config](examples/release-please-config.json), [manifest](examples/.release-please-manifest.json)) with the manifest at the current versions, and one release policy per component ([root](examples/release-policy.json), [graph](examples/graph-release-policy.json)). The `.` package uses `simple` with `version-file`, `include-component-in-tag: false` and `exclude-paths` for the other components.
 2. Remove the `## [Unreleased]` section from each changelog: release-please inserts its section above it, which would leave the entries stranded below.
-3. Replace the `release-tag.yml` caller by the [combined caller](examples/release-please.yml): one tagging job per policy, then `release-please` with `needs` on all of them, so tags exist before reconciliation. Pin every `uses` (including any remaining publisher) to the same merged commit SHA; `release-tag.yml` enforces it.
+3. Replace the `release-tag.yml` caller by the [combined caller](examples/release-please.yml): one tagging job per policy, then `release-please` with `needs` on all of them, so tags exist before reconciliation. Pin every `uses` (including any remaining publisher) to the same merged commit SHA; `release-tag.yml` enforces it. When one component is a published Python package that another component installs from PyPI, use the [published-package variant](examples/release-please-python.yml) instead.
 4. Install the preparation App on the repository and set `RELEASE_PR_APP_ID` and `RELEASE_PR_APP_PRIVATE_KEY`.
 5. Use squash merges with the PR title as the commit title, and conventional PR titles (`feat:`, `fix:`, `feat!:`): release-please ignores a non-conventional squash title. Merge the release PR with its title unchanged.
 

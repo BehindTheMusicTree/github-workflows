@@ -1,0 +1,123 @@
+# Place at .github/workflows/release.yml in an adopting repository: a published Python package (graph) and a
+# root component that depends on it from PyPI. Variant of examples/release-please.yml for that case.
+# One push on main runs, in order: tag graph -> build -> publish to PyPI -> verify the root's public
+# dependencies install -> tag root (and publish its GitHub Release) -> release-please.
+# The root tag, hence its Release, only exists once the published dependency is installable.
+# Register this exact workflow filename and the `pypi` environment (limited to the main branch) as the
+# PyPI Trusted Publisher. Replace example-graph, graph/ and the verification command with your own.
+name: Release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+# No concurrency group: cancelling or queueing runs could drop a pending release bump.
+# Recover from a failed job with "Re-run failed jobs"; prepare only uploads the files still missing.
+jobs:
+  tag-graph:
+    permissions:
+      contents: write
+    # Replace with the full merged, reviewed github-workflows commit SHA (the same SHA for every job below).
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@REPLACE_WITH_MERGED_COMMIT_SHA
+    with:
+      app-id: ${{ vars.RELEASE_APP_ID }}
+      release-policy-path: .github/graph-release-policy.json
+    secrets:
+      release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+  build-graph:
+    needs: tag-graph
+    # The tag is empty when this push carries no graph release; skipped dependents are handled below.
+    if: needs.tag-graph.outputs.tag != ''
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/publish-python.yml@REPLACE_WITH_MERGED_COMMIT_SHA
+    with:
+      release-tag: ${{ needs.tag-graph.outputs.tag }}
+      package-name: example-graph
+      package-directory: graph
+      release-policy-path: .github/graph-release-policy.json
+      artifact-name: graph-distributions
+  publish-graph:
+    needs: [tag-graph, build-graph]
+    if: needs.tag-graph.outputs.tag != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/example-graph
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/github-workflows
+          ref: ${{ needs.build-graph.outputs.foundation-sha }}
+          path: foundation
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-graph.outputs.artifact-name }}
+          path: dist
+      - name: Verify downloaded files and check PyPI retries
+        id: retry
+        env:
+          VERSION: ${{ needs.build-graph.outputs.version }}
+          REGISTRY: ${{ needs.build-graph.outputs.registry }}
+        run: python3 foundation/release/python-artifact.py prepare example-graph "$VERSION" dist pending --registry "$REGISTRY"
+      - name: Publish missing distributions with Trusted Publishing
+        if: steps.retry.outputs.upload-needed == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pending/
+          skip-existing: false
+      - name: Verify the complete published file set
+        env:
+          VERSION: ${{ needs.build-graph.outputs.version }}
+          REGISTRY: ${{ needs.build-graph.outputs.registry }}
+        run: python3 foundation/release/python-artifact.py verify example-graph "$VERSION" dist --registry "$REGISTRY"
+  verify-public-dependency:
+    needs: [tag-graph, publish-graph]
+    # Without a graph tag (root-only release) publish-graph is skipped by design. With one, it must have succeeded:
+    # a failed build-graph also leaves publish-graph "skipped", so its result alone cannot tell the cases apart.
+    if: ${{ !cancelled() && needs.tag-graph.result == 'success' && (needs.tag-graph.outputs.tag == '' || needs.publish-graph.result == 'success') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install the root from public indexes only
+        run: |
+          # The index can lag behind the upload: retry a few times before failing.
+          for attempt in 1 2 3 4 5 6; do
+            python3 -m pip install --no-cache-dir . && exit 0
+            echo "Public dependencies not yet installable (attempt $attempt/6)" >&2
+            sleep 10
+          done
+          exit 1
+  tag-root:
+    needs: verify-public-dependency
+    if: ${{ !cancelled() && needs.verify-public-dependency.result == 'success' }}
+    # contents: write lets release-tag.yml publish the GitHub Release once the dependency is verified.
+    permissions:
+      contents: write
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@REPLACE_WITH_MERGED_COMMIT_SHA
+    with:
+      app-id: ${{ vars.RELEASE_APP_ID }}
+      release-policy-path: .github/release-policy.json
+    secrets:
+      release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+  release-please:
+    # Default success condition: any failure upstream blocks the release PR reconciliation until rerun.
+    needs: [tag-graph, tag-root]
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-please.yml@REPLACE_WITH_MERGED_COMMIT_SHA
+    with:
+      app-id: ${{ vars.RELEASE_PR_APP_ID }}
+      release-policies: |
+        .github/release-policy.json
+        .github/graph-release-policy.json
+    secrets:
+      release-pr-app-private-key: ${{ secrets.RELEASE_PR_APP_PRIVATE_KEY }}
