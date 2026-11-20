@@ -19,6 +19,16 @@ from urllib.request import urlopen
 import zipfile
 
 
+# Closed table: the registry input selects a base URL, it never supplies one.
+REGISTRY_URLS = {'pypi': 'https://pypi.org', 'testpypi': 'https://test.pypi.org'}
+
+
+def registry_url(registry):
+    if registry not in REGISTRY_URLS:
+        raise ValueError(f'Unknown registry {registry!r}; expected one of {", ".join(sorted(REGISTRY_URLS))}')
+    return REGISTRY_URLS[registry]
+
+
 def package_directory(directory, validation):
     if directory != '.':
         validation['repository_path'](directory)
@@ -36,6 +46,8 @@ def package_directory(directory, validation):
 def source_version(package, tag, validation=None, package_directory_path='.',
                    release_policy_path='.github/release-policy.json'):
     canonical_name(package)
+    if not isinstance(tag, str) or not tag:
+        raise ValueError('A release tag is required')
     if validation is None:
         validation = runpy.run_path(str(Path(__file__).with_name('validate-release.py')))
     package_directory(package_directory_path, validation)
@@ -99,8 +111,8 @@ def distributions(package, version, directory):
     return {'package': name, 'version': version, 'files': hashes}
 
 
-def registry_files(package, version, opener=urlopen):
-    url = f'https://pypi.org/pypi/{quote(package, safe="")}/{quote(version, safe="")}/json'
+def registry_files(package, version, opener=urlopen, registry='pypi'):
+    url = f'{registry_url(registry)}/pypi/{quote(package, safe="")}/{quote(version, safe="")}/json'
     try:
         with opener(url, timeout=30) as response:
             metadata = json.load(response)
@@ -133,11 +145,12 @@ def missing_files(manifest, remote):
     return sorted(set(expected) - set(remote))
 
 
-def prepare(package, version, directory, pending, opener=urlopen):
+def prepare(package, version, directory, pending, opener=urlopen, registry='pypi'):
+    registry_url(registry)
     manifest = distributions(package, version, directory)
     if json.loads((Path(directory) / 'manifest.json').read_text()) != manifest:
         raise ValueError('Downloaded distributions differ from the build manifest')
-    missing = missing_files(manifest, registry_files(manifest['package'], version, opener))
+    missing = missing_files(manifest, registry_files(manifest['package'], version, opener, registry))
     # Refuse stale staging files so only this verified missing set can be uploaded.
     pending = Path(pending)
     pending.mkdir(parents=True, exist_ok=False)
@@ -153,6 +166,7 @@ def main():
     parser.add_argument('version')
     parser.add_argument('directory', type=Path)
     parser.add_argument('pending', type=Path, nargs='?')
+    parser.add_argument('--registry', default='pypi')
     args = parser.parse_args()
     if args.command == 'manifest':
         manifest = distributions(args.package, args.version, args.directory)
@@ -161,13 +175,14 @@ def main():
         if args.pending is None:
             raise ValueError('A new pending directory is required')
         output = os.environ['GITHUB_OUTPUT']
-        needed = prepare(args.package, args.version, args.directory, args.pending)
+        needed = prepare(args.package, args.version, args.directory, args.pending, registry=args.registry)
         with open(output, 'a', encoding='utf-8') as stream:
             stream.write(f'upload-needed={str(needed).lower()}\n')
     else:
+        registry_url(args.registry)
         manifest = distributions(args.package, args.version, args.directory)
-        if missing_files(manifest, registry_files(manifest['package'], args.version)):
-            raise ValueError('PyPI does not yet contain every intended distribution')
+        if missing_files(manifest, registry_files(manifest['package'], args.version, registry=args.registry)):
+            raise ValueError('The registry does not yet contain every intended distribution')
 
 
 if __name__ == '__main__':

@@ -3,6 +3,14 @@ name: Prepare Python publication
 on:
   workflow_call:
     inputs:
+      release-tag:
+        description: Tag output of a release-tag.yml job in the same run (for example needs.tag-graph.outputs.tag)
+        required: true
+        type: string
+      registry:
+        description: Target registry, pypi or testpypi; any other value fails before the build
+        default: pypi
+        type: string
       package-name:
         description: PyPI project name declared in the caller's release policy packages
         required: true
@@ -33,6 +41,9 @@ on:
       foundation-sha:
         description: Exact foundation commit to use for retry verification
         value: ${{ jobs.build.outputs.foundation-sha }}
+      registry:
+        description: Validated registry to pass to the helper in the caller's publication job
+        value: ${{ inputs.registry }}
 
 permissions:
   contents: read
@@ -53,21 +64,45 @@ jobs:
           [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Workflow commit SHA unavailable' >&2; exit 1; }
           test "$WORKFLOW_REPOSITORY" = BehindTheMusicTree/github-workflows
           echo "sha=$WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
-      - name: Require a tag push
+      - name: Require a main push, a release tag and a known registry
         env:
           EVENT: ${{ github.event_name }}
-          REF_TYPE: ${{ github.ref_type }}
+          REF: ${{ github.ref }}
           DELETED: ${{ github.event.deleted }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          REGISTRY: ${{ inputs.registry }}
         run: |
           test "$EVENT" = push
-          test "$REF_TYPE" = tag
+          test "$REF" = refs/heads/main
           test "$DELETED" = false
+          test -n "$RELEASE_TAG" || { echo 'release-tag is empty: no release tag was created in this run' >&2; exit 1; }
+          case "$REGISTRY" in
+            pypi|testpypi) ;;
+            *) echo "Unknown registry: $REGISTRY" >&2; exit 1 ;;
+          esac
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
           path: caller
+      - name: Fetch the release tag
+        working-directory: caller
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # The checkout drops credentials, so authenticate this one fetch (read-only token) instead of persisting them.
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0 2>/dev/null || printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64)"
+          echo "::add-mask::$auth"
+          # A tag just created through the API can take a moment to be served by git.
+          for attempt in 1 2 3 4 5 6; do
+            git -c "http.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags origin "+refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG" && exit 0
+            echo "Tag $RELEASE_TAG not yet fetchable (attempt $attempt/6)" >&2
+            sleep 5
+          done
+          echo "Tag $RELEASE_TAG could not be fetched" >&2
+          exit 1
       - uses: actions/checkout@v5
         with:
           repository: BehindTheMusicTree/github-workflows
@@ -81,6 +116,7 @@ jobs:
         id: release
         working-directory: caller
         env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
           PACKAGE: ${{ inputs.package-name }}
           PACKAGE_DIRECTORY: ${{ inputs.package-directory }}
           RELEASE_POLICY_PATH: ${{ inputs.release-policy-path }}
@@ -91,7 +127,7 @@ jobs:
           from pathlib import Path
           helper = runpy.run_path('../foundation/release/python-artifact.py')
           version = helper['source_version'](
-              os.environ['PACKAGE'], os.environ['GITHUB_REF_NAME'],
+              os.environ['PACKAGE'], os.environ['RELEASE_TAG'],
               package_directory_path=os.environ['PACKAGE_DIRECTORY'],
               release_policy_path=os.environ['RELEASE_POLICY_PATH'])
           with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:

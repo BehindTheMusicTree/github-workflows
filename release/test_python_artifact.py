@@ -60,6 +60,23 @@ class PythonArtifactTests(unittest.TestCase):
     def prepare(self, opener):
         return module.prepare('example-pkg', '1.2.3', self.dist, self.root / 'pending', opener)
 
+    def test_testpypi_uses_its_own_api_url(self):
+        urls = []
+        def opener(url, timeout):
+            urls.append(url)
+            raise HTTPError(url, 404, 'missing', {}, None)
+        self.assertEqual(module.registry_files('example-pkg', '1.2.3', opener, 'testpypi'), {})
+        self.assertEqual(urls, ['https://test.pypi.org/pypi/example-pkg/1.2.3/json'])
+
+    def test_unknown_registry_fails_before_any_lookup(self):
+        for registry in ['', 'PyPI', 'https://evil.example', 'test']:
+            with self.subTest(registry=registry), self.assertRaisesRegex(ValueError, 'Unknown registry'):
+                module.prepare('example-pkg', '1.2.3', self.dist, self.root / 'pending',
+                               self.failing(AssertionError('must not query')), registry)
+            self.assertFalse((self.root / 'pending').exists())
+        with self.assertRaisesRegex(ValueError, 'Unknown registry'):
+            module.registry_files('example-pkg', '1.2.3', self.failing(AssertionError('must not query')), 'nope')
+
     def test_manifest_checks_both_formats_and_hashes(self):
         self.assertEqual(self.manifest['package'], 'example-pkg')
         self.assertEqual(self.manifest['files'], {
@@ -161,6 +178,12 @@ class SourceVersionTests(unittest.TestCase):
         self.validation['git'].assert_any_call('merge-base', '--is-ancestor', self.commit, 'refs/remotes/origin/main')
         self.validation['policy_at'].assert_called_once_with(self.commit, '.github/release-policy.json')
         self.validation['check_current'].assert_called_once_with(self.commit, self.policy)
+
+    def test_empty_tag_fails_before_git(self):
+        for tag in ['', None]:
+            with self.subTest(tag=tag), self.assertRaisesRegex(ValueError, 'tag is required'):
+                module.source_version('example-pkg', tag, self.validation)
+        self.validation['git'].assert_not_called()
 
     def test_wrong_tag_commit_fails(self):
         self.validation['git'].side_effect = [self.commit, 'b' * 40]
