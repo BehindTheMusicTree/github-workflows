@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.0] - 2026-11-20
+
+
 ### Changed
 
 - **`python-artifact.py verify` waits for the registry**: it reads the project's PyPI Simple index (PEP 691) instead of the per-version JSON URL, whose 404 cached by `prepare` outlived the upload, and retries for up to 660 s (`--wait-seconds`, `0` reads once) while files are missing or the registry answers 429/5xx. Digest mismatches, foreign or yanked files and other 4xx still fail at once; `prepare` never retries.
