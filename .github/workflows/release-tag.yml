@@ -82,7 +82,7 @@ jobs:
     needs: validate
     if: needs.validate.outputs.release == 'true'
     runs-on: ubuntu-latest
-    # Each event is independent: a global concurrency group can drop pending bumps.
+    # Each event is independent: callers use a per-commit group (`<stem>-${{ github.sha }}`, no cancel); a ref-level group replaces a pending run and drops its bump.
     steps:
       - name: Require the caller-pinned workflow commit
         env:
