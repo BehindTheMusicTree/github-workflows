@@ -145,8 +145,8 @@ jobs:
           if base:
               def git(*args):
                   # -z and quotePath=false keep paths with spaces or non-ASCII characters verbatim.
-                  return subprocess.run(['git', '-c', 'core.quotePath=false', *args], capture_output=True,
-                                        text=True, encoding='utf-8', check=True).stdout
+                  return subprocess.run(['git', '--literal-pathspecs', '-c', 'core.quotePath=false', *args], capture_output=True,
+                                        text=True, encoding='utf-8', errors='replace', check=True).stdout
 
               def resolve(path):
                   if path in lines:
@@ -164,15 +164,17 @@ jobs:
               base_range = f'origin/{base}...HEAD'
               tokens = git('diff', '--name-status', '--no-renames', '-z', '--diff-filter=AM', base_range).split('\0')
               report_suffixes = {Path(f).suffix for f in lines} - {''}
+              report_dirs = {str(Path(f).parent) for f in lines}
+
+              def in_reported_dir(path):
+                  # Files outside every directory holding reported files (tests, tooling) are usually excluded on purpose.
+                  d = str(Path(path).parent)
+                  return any(d == r or d.endswith('/' + r) or r.endswith('/' + d) for r in report_dirs)
               executable = covered = 0
               missed, unreported = [], []
               for status, path in zip(tokens[0::2], tokens[1::2]):
                   match = resolve(path)
                   if match == '':
-                      continue
-                  if match is None:
-                      if status == 'A' and Path(path).suffix in report_suffixes:
-                          unreported.append(path)
                       continue
                   added = set()
                   for raw in git('diff', '-U0', '--no-color', base_range, '--', path).splitlines():
@@ -180,6 +182,10 @@ jobs:
                       if m:
                           start, count = int(m.group(1)), int(m.group(2) or 1)
                           added.update(range(start, start + count))
+                  if match is None:
+                      if status == 'A' and added and Path(path).suffix in report_suffixes and in_reported_dir(path):
+                          unreported.append(path)
+                      continue
                   data = lines[match]
                   for n in sorted(added & data.keys()):
                       executable += 1

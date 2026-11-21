@@ -88,11 +88,14 @@ scenario() {
   git update-ref refs/remotes/origin/main HEAD
   git checkout -q -b change
   for f in "$@"; do mkdir -p "$(dirname "$f")" && seq 1 10 | sed 's/^/y = /' > "$f"; done
-  git add . && git commit -q -m change
+  git add . && git commit -q --allow-empty -m change
 }
 
 scenario -- new.py;                  multi_report other.py=1;           run_check fail 'new source file absent from the reports'
 scenario -- new.py;                  multi_report new.py=1;             run_check pass 'new source file present in the reports'
+scenario -- tests/new.py;            multi_report other.py=1;           run_check pass 'new file outside the reported directories is not flagged'
+scenario -- 'a*b.py';                multi_report 'a*b.py=1';           run_check pass 'path with glob characters'
+scenario -- ;                        : > empty.py; git add . && git commit -q -m empty; multi_report other.py=1; run_check pass 'new empty file is not flagged'
 scenario -- new.md;                  multi_report other.py=1;           run_check pass 'new non-source file is not flagged'
 scenario old.py -- old.py;           multi_report other.py=1;           run_check pass 'modified file absent from the reports is skipped'
 scenario util.py -- util.py;         multi_report api/util.py=1 web/util.py=1; run_check fail 'ambiguous suffix match'
