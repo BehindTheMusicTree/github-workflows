@@ -227,7 +227,7 @@ Enforces the organization coverage standard in one place: global lines ≥ 80 %,
 | `report-artifacts` | `coverage-*`  | Artifact name pattern of the uploaded reports.                                               |
 | `base-ref`         | PR base       | Branch the patch is compared with.                                                           |
 
-The job fails when no report is found or when the reports hold no branch data.
+The job fails when no report is found or when the reports hold no branch data. Cobertura reports only carry per-line branch counts, so reports of sharded test runs for the same code (unit and e2e, a matrix) must be combined into one report before upload (`coverage combine`, lcov merge); otherwise the branch figure is the per-line maximum and under-reports.
 
 ```yaml
 jobs:

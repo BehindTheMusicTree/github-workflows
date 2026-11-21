@@ -53,7 +53,7 @@ jobs:
           REPORTS_DIR: coverage-reports
         run: |
           python3 - <<'PY'
-          import os, re, subprocess, sys
+          import math, os, re, subprocess, sys
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
@@ -62,7 +62,7 @@ jobs:
           limits = {}
           for key, floor in FLOORS.items():
               limits[key] = float(os.environ[key])
-              if limits[key] < floor:
+              if not math.isfinite(limits[key]) or limits[key] < floor:
                   errors.append(f'{key.lower()} threshold {limits[key]:g} is below the organization standard {floor:g}')
           if errors:
               sys.exit('coverage: ' + '; '.join(errors))
@@ -72,7 +72,7 @@ jobs:
 
           def norm(path):
               path = path.replace('\\', '/')
-              return path[len(workspace):] if path.startswith(workspace) else path.lstrip('./')
+              return path[len(workspace):] if path.startswith(workspace) else path.removeprefix('./')
 
           def add_line(f, n, hits):
               d = lines.setdefault(f, {})
