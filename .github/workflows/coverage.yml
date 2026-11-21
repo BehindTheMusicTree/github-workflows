@@ -169,7 +169,7 @@ jobs:
               def in_reported_dir(path):
                   # Files outside every directory holding reported files (tests, tooling) are usually excluded on purpose.
                   d = str(Path(path).parent)
-                  return any(d == r or d.endswith('/' + r) or r.endswith('/' + d) for r in report_dirs)
+                  return any(d == r or d.endswith('/' + r) or r.endswith('/' + d) or (d == '.' and r.startswith('/')) for r in report_dirs)
               executable = covered = 0
               missed, unreported = [], []
               for status, path in zip(tokens[0::2], tokens[1::2]):

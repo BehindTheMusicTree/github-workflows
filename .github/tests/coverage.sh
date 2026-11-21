@@ -93,6 +93,7 @@ scenario() {
 
 scenario -- new.py;                  multi_report other.py=1;           run_check fail 'new source file absent from the reports'
 scenario -- new.py;                  multi_report new.py=1;             run_check pass 'new source file present in the reports'
+scenario -- new.py;                  multi_report /app/other.py=1;      run_check fail 'new file flagged with out-of-workspace absolute report paths'
 scenario -- tests/new.py;            multi_report other.py=1;           run_check pass 'new file outside the reported directories is not flagged'
 scenario -- 'a*b.py';                multi_report 'a*b.py=1';           run_check pass 'path with glob characters'
 scenario -- ;                        : > empty.py; git add . && git commit -q -m empty; multi_report other.py=1; run_check pass 'new empty file is not flagged'
