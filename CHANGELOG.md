@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `coverage.yml` patch check: a new source file (same extension as the files in the reports) absent from the coverage reports now fails the job instead of being ignored; a changed path matching several report paths by suffix resolves to the longest match and fails when the match is ambiguous; changed paths containing spaces or non-ASCII characters are matched correctly.
+
 ## [6.3.0] - 2026-11-21
 
 

@@ -60,4 +60,44 @@ cobertura 10 10 yes; run_check pass 'raised threshold' LINE=95
 rm -rf reports; mkdir reports;  run_check fail 'no report'
 printf 'SF:src.py\nDA:1,1\nDA:2,1\nBRDA:1,0,0,1\nBRDA:1,0,1,1\nend_of_record\n' > reports/lcov.info
 run_check pass 'lcov report' PATCH=90 BASE_REF=
+
+# multi_report FILE=HITS... -> reports/cov.xml: 10 lines per file (HITS 1 covered, 0 not) plus a covered filler
+multi_report() {
+  mkdir -p reports && rm -f reports/*
+  PYTHONIOENCODING=utf-8 python3 - "$@" > reports/cov.xml <<'PY'
+import sys
+from xml.sax.saxutils import quoteattr
+classes = [('filler.py', 1, 300)] + [(a.rsplit('=', 1)[0], int(a.rsplit('=', 1)[1]), 10) for a in sys.argv[1:]]
+out = []
+for name, hits, count in classes:
+    rows = ''.join(f'<line number="{n}" hits="{hits}" branch="true" condition-coverage="{100 if hits else 0}% ({1 if hits else 0}/1)"/>' for n in range(1, count + 1))
+    out.append(f'<class filename={quoteattr(name)}><lines>{rows}</lines></class>')
+print('<coverage><packages><package><classes>' + ''.join(out) + '</classes></package></packages></coverage>')
+PY
+}
+
+# scenario BASE_FILE... -- CHANGED_FILE... : fresh repo with the base files committed, then the changed files
+# (existing or new) rewritten and committed on a branch compared with origin/main.
+scenario() {
+  local f
+  cd "$work" && rm -rf scenario && git init -q scenario && cd scenario
+  git config user.email t@example.com && git config user.name t
+  echo base > README.md
+  while [ "$1" != -- ]; do mkdir -p "$(dirname "$1")" && seq 1 10 | sed 's/^/x = /' > "$1"; shift; done; shift
+  git add . && git commit -q -m base
+  git update-ref refs/remotes/origin/main HEAD
+  git checkout -q -b change
+  for f in "$@"; do mkdir -p "$(dirname "$f")" && seq 1 10 | sed 's/^/y = /' > "$f"; done
+  git add . && git commit -q -m change
+}
+
+scenario -- new.py;                  multi_report other.py=1;           run_check fail 'new source file absent from the reports'
+scenario -- new.py;                  multi_report new.py=1;             run_check pass 'new source file present in the reports'
+scenario -- new.md;                  multi_report other.py=1;           run_check pass 'new non-source file is not flagged'
+scenario old.py -- old.py;           multi_report other.py=1;           run_check pass 'modified file absent from the reports is skipped'
+scenario util.py -- util.py;         multi_report api/util.py=1 web/util.py=1; run_check fail 'ambiguous suffix match'
+scenario pkg/web/util.py -- pkg/web/util.py; multi_report util.py=0 web/util.py=1; run_check pass 'longest suffix match wins'
+scenario web/util.py -- web/util.py; multi_report util.py=0 web/util.py=1; run_check pass 'exact match wins over a suffix match'
+scenario 'dir é/a b.py' -- 'dir é/a b.py'; multi_report 'dir é/a b.py=0'; run_check fail 'uncovered changes in a path with spaces and non-ASCII'
+scenario 'dir é/a b.py' -- 'dir é/a b.py'; multi_report 'dir é/a b.py=1'; run_check pass 'covered changes in a path with spaces and non-ASCII'
 echo 'all coverage tests passed'
