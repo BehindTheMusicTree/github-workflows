@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.3.0] - 2026-11-21
+
+
 ### Added
 
 - `coverage.yml` reusable workflow enforcing the organization coverage standard (global lines ≥ 80 %, branches ≥ 70 %, changed lines ≥ 90 %) over the Cobertura/lcov reports uploaded by the caller's test jobs; thresholds can only be raised, and missing reports or branch data fail the job.
