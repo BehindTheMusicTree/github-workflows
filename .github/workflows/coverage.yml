@@ -1,0 +1,180 @@
+# Organization coverage standard (global lines, global branches, patch lines), enforced in one place.
+# Test jobs upload their Cobertura XML / lcov reports as artifacts named `coverage-*` and run with their own
+# threshold disabled; this workflow merges the reports and applies the standard. Thresholds can only be raised.
+name: Coverage
+
+on:
+  workflow_call:
+    inputs:
+      line:
+        description: Minimum global line coverage (%); at least 80
+        type: number
+        default: 80
+      branch:
+        description: Minimum global branch coverage (%); at least 70
+        type: number
+        default: 70
+      patch:
+        description: Minimum coverage of the lines the PR changes (%); at least 90
+        type: number
+        default: 90
+      report-artifacts:
+        description: Artifact name pattern of the uploaded coverage reports
+        type: string
+        default: coverage-*
+      base-ref:
+        description: Branch the patch is compared with; defaults to the pull request base
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out caller
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download coverage reports
+        uses: actions/download-artifact@v5
+        with:
+          pattern: ${{ inputs.report-artifacts }}
+          path: coverage-reports
+      - name: Check coverage standard
+        env:
+          LINE: ${{ inputs.line }}
+          BRANCH: ${{ inputs.branch }}
+          PATCH: ${{ inputs.patch }}
+          BASE_REF: ${{ inputs.base-ref || github.base_ref }}
+          REPORTS_DIR: coverage-reports
+        run: |
+          python3 - <<'PY'
+          import math, os, re, subprocess, sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          FLOORS = {'LINE': 80.0, 'BRANCH': 70.0, 'PATCH': 90.0}
+          errors = []
+          limits = {}
+          for key, floor in FLOORS.items():
+              limits[key] = float(os.environ[key])
+              if not math.isfinite(limits[key]) or limits[key] < floor:
+                  errors.append(f'{key.lower()} threshold {limits[key]:g} is below the organization standard {floor:g}')
+          if errors:
+              sys.exit('coverage: ' + '; '.join(errors))
+
+          workspace = os.getcwd().rstrip('/') + '/'
+          lines, branches = {}, {}  # file -> {line: hits}, file -> {(line, branch): taken}
+
+          def norm(path):
+              path = path.replace('\\', '/')
+              return path[len(workspace):] if path.startswith(workspace) else path.removeprefix('./')
+
+          def add_line(f, n, hits):
+              d = lines.setdefault(f, {})
+              d[n] = max(d.get(n, 0), hits)
+
+          def add_branch(f, key, taken):
+              d = branches.setdefault(f, {})
+              d[key] = d.get(key, False) or taken
+
+          def read_cobertura(path):
+              root = ET.parse(path).getroot()
+              sources = [s.text.strip() for s in root.iter('source') if s.text and s.text.strip()]
+              for cls in root.iter('class'):
+                  name = cls.get('filename')
+                  f = norm(name)
+                  for source in sources:
+                      candidate = norm(os.path.join(source, name))
+                      if os.path.isfile(candidate):
+                          f = candidate
+                          break
+                  for ln in cls.iter('line'):
+                      n, hits = int(ln.get('number')), int(ln.get('hits'))
+                      add_line(f, n, hits)
+                      match = re.search(r'\((\d+)/(\d+)\)', ln.get('condition-coverage') or '')
+                      if match:
+                          covered, total = int(match.group(1)), int(match.group(2))
+                          for i in range(total):
+                              add_branch(f, (n, i), i < covered)
+
+          def read_lcov(path):
+              f = None
+              for raw in Path(path).read_text().splitlines():
+                  if raw.startswith('SF:'):
+                      f = norm(raw[3:])
+                  elif raw.startswith('DA:') and f:
+                      n, hits = raw[3:].split(',')[:2]
+                      add_line(f, int(n), int(hits))
+                  elif raw.startswith('BRDA:') and f:
+                      n, block, branch, taken = raw[5:].split(',')[:4]
+                      add_branch(f, (int(n), block + ':' + branch), taken not in ('-', '0'))
+
+          found = 0
+          for path in sorted(Path(os.environ['REPORTS_DIR']).rglob('*')):
+              if path.suffix == '.xml':
+                  read_cobertura(path)
+              elif path.name == 'lcov.info' or path.suffix == '.lcov':
+                  read_lcov(path)
+              else:
+                  continue
+              found += 1
+          if not found or not lines:
+              sys.exit('coverage: no Cobertura XML or lcov report found; upload the test jobs reports as artifacts matching the report-artifacts pattern')
+
+          total_lines = sum(len(v) for v in lines.values())
+          covered_lines = sum(1 for v in lines.values() for h in v.values() if h > 0)
+          total_branches = sum(len(v) for v in branches.values())
+          covered_branches = sum(1 for v in branches.values() for t in v.values() if t)
+          if not total_branches:
+              sys.exit('coverage: the reports contain no branch data; enable branch coverage (coverage.py branch = true, v8 provider for JS)')
+          line_pct = 100.0 * covered_lines / total_lines
+          branch_pct = 100.0 * covered_branches / total_branches
+          print(f'lines {line_pct:.1f}% ({covered_lines}/{total_lines}), required {limits["LINE"]:g}')
+          print(f'branches {branch_pct:.1f}% ({covered_branches}/{total_branches}), required {limits["BRANCH"]:g}')
+          if line_pct < limits['LINE']:
+              errors.append(f'line coverage {line_pct:.1f}% < {limits["LINE"]:g}%')
+          if branch_pct < limits['BRANCH']:
+              errors.append(f'branch coverage {branch_pct:.1f}% < {limits["BRANCH"]:g}%')
+
+          base = os.environ.get('BASE_REF', '').strip()
+          if base:
+              diff = subprocess.run(['git', 'diff', '-U0', '--no-color', f'origin/{base}...HEAD'],
+                                    capture_output=True, text=True, check=True).stdout
+              changed, current = {}, None
+              for raw in diff.splitlines():
+                  if raw.startswith('+++ '):
+                      current = raw[6:] if raw.startswith('+++ b/') else None
+                  elif raw.startswith('@@') and current:
+                      m = re.search(r'\+(\d+)(?:,(\d+))?', raw)
+                      start, count = int(m.group(1)), int(m.group(2) or 1)
+                      changed.setdefault(current, set()).update(range(start, start + count))
+              index = {f: v for f, v in lines.items()}
+              executable = covered = 0
+              missed = []
+              for path, added in changed.items():
+                  data = next((v for f, v in index.items() if f == path or f.endswith('/' + path) or path.endswith('/' + f)), None)
+                  if data is None:
+                      continue
+                  for n in sorted(added & data.keys()):
+                      executable += 1
+                      if data[n] > 0:
+                          covered += 1
+                      else:
+                          missed.append(f'{path}:{n}')
+              if executable:
+                  patch_pct = 100.0 * covered / executable
+                  print(f'patch {patch_pct:.1f}% ({covered}/{executable}), required {limits["PATCH"]:g}')
+                  if patch_pct < limits['PATCH']:
+                      errors.append(f'patch coverage {patch_pct:.1f}% < {limits["PATCH"]:g}% (uncovered: {", ".join(missed[:20])})')
+              else:
+                  print('patch: no executable changed lines')
+          else:
+              print('patch: no base ref (not a pull request); skipped')
+          if errors:
+              sys.exit('coverage: ' + '; '.join(errors))
+          PY

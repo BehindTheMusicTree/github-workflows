@@ -10,6 +10,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 - [Available Workflows](#available-workflows)
   - [Agent drift](#agent-drift)
+  - [Coverage](#coverage)
   - [Actionlint](#actionlint)
   - [Python publication](#python-publication)
   - [Call Redeployment Webhook](#call-redeployment-webhook)
@@ -211,6 +212,29 @@ jobs:
 ```
 
 The caller checkout must contain `AGENTS.md` and a `CLAUDE.md` importing it. The check is read-only. See the [agent-config documentation](https://github.com/BehindTheMusicTree/agent-config) for the adapter contract.
+
+### Coverage
+
+Enforces the organization coverage standard in one place: global lines ≥ 80 %, global branches ≥ 70 %, and ≥ 90 % of the lines a pull request changes. The test jobs of the caller upload their Cobertura XML (coverage.py `--cov-report=xml` with `branch = true`) or lcov (`vitest`/`jest` with the v8 provider) reports as artifacts named `coverage-*` and run with their own threshold disabled; this workflow merges them and applies the standard.
+
+**Workflow file:** `.github/workflows/coverage.yml`
+
+| Input              | Default       | Description                                                                                  |
+| ------------------ | ------------- | -------------------------------------------------------------------------------------------- |
+| `line`             | `80`          | Minimum global line coverage (%). A value below 80 fails the job: thresholds can only be raised. |
+| `branch`           | `70`          | Minimum global branch coverage (%); at least 70.                                             |
+| `patch`            | `90`          | Minimum coverage of changed lines (%); at least 90. Skipped outside pull requests.           |
+| `report-artifacts` | `coverage-*`  | Artifact name pattern of the uploaded reports.                                               |
+| `base-ref`         | PR base       | Branch the patch is compared with.                                                           |
+
+The job fails when no report is found or when the reports hold no branch data. Cobertura reports only carry per-line branch counts, so reports of sharded test runs for the same code (unit and e2e, a matrix) must be combined into one report before upload (`coverage combine`, lcov merge); otherwise the branch figure is the per-line maximum and under-reports.
+
+```yaml
+jobs:
+  coverage:
+    needs: [tests]
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/coverage.yml@<release-tag-or-commit>
+```
 
 ### Actionlint
 

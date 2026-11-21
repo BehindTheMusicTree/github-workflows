@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `coverage.yml` reusable workflow enforcing the organization coverage standard (global lines ≥ 80 %, branches ≥ 70 %, changed lines ≥ 90 %) over the Cobertura/lcov reports uploaded by the caller's test jobs; thresholds can only be raised, and missing reports or branch data fail the job.
+
 ### Fixed
 
 - `release-please.yml` arms auto-merge on the release PRs that `release-please-action` reports (`prs` output) in addition to the label listing, which can lag behind a PR opened seconds earlier and left a new release PR unarmed until the next push to `main`. A reported PR that is not an open, pending release PR from a `release-please--*` branch of the repository fails the step.
