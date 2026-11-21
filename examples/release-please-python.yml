@@ -11,7 +11,11 @@ on:
     branches: [main]
 permissions:
   contents: read
-# No concurrency group: cancelling or queueing runs could drop a pending release bump.
+# One run per pushed commit, never cancelled or replaced: release-tag validates only before..after, so a replaced run would leave its bump untagged.
+concurrency:
+  group: release-${{ github.sha }}
+  cancel-in-progress: false
+# Keep this per-commit group: a ref-level group would replace a pending run and drop its release bump.
 # Recover from a failed job with "Re-run failed jobs"; prepare only uploads the files still missing, and verify
 # waits up to 660 s for the registry, so a re-run is only needed after a real failure.
 jobs:

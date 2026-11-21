@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI
+
+- Declare the canonical workflow-level `concurrency`: `test-actions.yml` cancels superseded PR runs; `release.yml` and the release caller examples use a per-commit group (`<stem>-${{ github.sha }}`, no cancel) so a pending run is never replaced and no release bump goes untagged (refs BehindTheMusicTree/github-config#69).
+
 ## [6.3.1] - 2026-11-21
 
 

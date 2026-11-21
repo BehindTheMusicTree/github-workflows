@@ -7,6 +7,10 @@ on:
     branches: [main]
 permissions:
   contents: read
+# One run per pushed commit, never cancelled or replaced: release-tag validates only before..after, so a replaced run would leave its bump untagged.
+concurrency:
+  group: release-${{ github.sha }}
+  cancel-in-progress: false
 jobs:
   tag-root:
     # contents: write lets release-tag.yml publish GitHub-only releases; delete any separate publish workflow.

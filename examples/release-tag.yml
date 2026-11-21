@@ -6,6 +6,10 @@ on:
     branches: [main]
 permissions:
   contents: read
+# One run per pushed commit, never cancelled or replaced: release-tag validates only before..after, so a replaced run would leave its bump untagged.
+concurrency:
+  group: release-tag-${{ github.sha }}
+  cancel-in-progress: false
 jobs:
   release:
     permissions:
