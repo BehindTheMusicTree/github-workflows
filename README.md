@@ -136,7 +136,8 @@ conditions explicitly:
   graph/pyproject.toml>` and retries until 660 s (30 s sleeps). Without the exact pin, pip
   succeeds by installing an older graph that the root range allows while the Simple index
   page is stale, and the root tag would be created on an unpublished dependency. A root-only
-  release finds the pinned version already published and passes at the first attempt.
+  release publishes nothing in the run (`needs.tag-graph.outputs.tag == ''`), so the step
+  makes a single attempt: the pinned version is already public and a failure is real.
 
 Do not add a global concurrency group: cancelling or queueing runs could drop a pending
 release bump. A registry visibility delay no longer needs a rerun (see the waits above);

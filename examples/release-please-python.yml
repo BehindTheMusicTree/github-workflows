@@ -91,17 +91,21 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install the root from public indexes only
+        env:
+          GRAPH_TAG: ${{ needs.tag-graph.outputs.tag }}
         run: |
           # The installer's Simple index page is cached for up to 600 s after an upload, and pip happily
           # installs an older graph that the root's range still allows. Pin the exact version just
           # published (same source as the check below) so a stale page fails, then retry up to 660 s.
+          # Without a graph tag in this run nothing was just published: the version is already public,
+          # so a failure is real and a single attempt is enough.
           GRAPH_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('graph/pyproject.toml', 'rb'))['project']['version'])")
-          deadline=$((SECONDS + 660))
+          if [ -n "$GRAPH_TAG" ]; then deadline=$((SECONDS + 660)); else deadline=$SECONDS; fi
           attempt=1
           while true; do
             python3 -m pip install --no-cache-dir . "example-graph==$GRAPH_VERSION" && exit 0
             if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "example-graph $GRAPH_VERSION is still not installable after 660 s" >&2
+              echo "example-graph $GRAPH_VERSION is not installable (${SECONDS}s elapsed)" >&2
               exit 1
             fi
             echo "example-graph $GRAPH_VERSION not yet installable (attempt $attempt, ${SECONDS}s elapsed)" >&2
