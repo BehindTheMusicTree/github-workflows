@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.3.1] - 2026-11-21
+
+
 ### Changed
 
 - **Published-package example**: `verify-public-dependency` makes a single install attempt when the run publishes no graph (`tag-graph.outputs.tag == ''`) instead of retrying for 660 s on a real failure.
