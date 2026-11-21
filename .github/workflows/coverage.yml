@@ -143,29 +143,58 @@ jobs:
 
           base = os.environ.get('BASE_REF', '').strip()
           if base:
-              diff = subprocess.run(['git', 'diff', '-U0', '--no-color', f'origin/{base}...HEAD'],
-                                    capture_output=True, text=True, check=True).stdout
-              changed, current = {}, None
-              for raw in diff.splitlines():
-                  if raw.startswith('+++ '):
-                      current = raw[6:] if raw.startswith('+++ b/') else None
-                  elif raw.startswith('@@') and current:
-                      m = re.search(r'\+(\d+)(?:,(\d+))?', raw)
-                      start, count = int(m.group(1)), int(m.group(2) or 1)
-                      changed.setdefault(current, set()).update(range(start, start + count))
-              index = {f: v for f, v in lines.items()}
+              def git(*args):
+                  # -z and quotePath=false keep paths with spaces or non-ASCII characters verbatim.
+                  return subprocess.run(['git', '--literal-pathspecs', '-c', 'core.quotePath=false', *args], capture_output=True,
+                                        text=True, encoding='utf-8', errors='replace', check=True).stdout
+
+              def resolve(path):
+                  if path in lines:
+                      return path
+                  candidates = [f for f in lines if f.endswith('/' + path) or path.endswith('/' + f)]
+                  if not candidates:
+                      return None
+                  best = max(min(len(f), len(path)) for f in candidates)
+                  top = [f for f in candidates if min(len(f), len(path)) == best]
+                  if len(top) > 1:
+                      errors.append(f'patch coverage: {path} matches several report paths ({", ".join(sorted(top))}); make the report paths unambiguous')
+                      return ''
+                  return top[0]
+
+              base_range = f'origin/{base}...HEAD'
+              tokens = git('diff', '--name-status', '--no-renames', '-z', '--diff-filter=AM', base_range).split('\0')
+              report_suffixes = {Path(f).suffix for f in lines} - {''}
+              report_dirs = {str(Path(f).parent) for f in lines}
+
+              def in_reported_dir(path):
+                  # Files outside every directory holding reported files (tests, tooling) are usually excluded on purpose.
+                  d = str(Path(path).parent)
+                  return any(d == r or d.endswith('/' + r) or r.endswith('/' + d) or (d == '.' and r.startswith('/')) for r in report_dirs)
               executable = covered = 0
-              missed = []
-              for path, added in changed.items():
-                  data = next((v for f, v in index.items() if f == path or f.endswith('/' + path) or path.endswith('/' + f)), None)
-                  if data is None:
+              missed, unreported = [], []
+              for status, path in zip(tokens[0::2], tokens[1::2]):
+                  match = resolve(path)
+                  if match == '':
                       continue
+                  added = set()
+                  for raw in git('diff', '-U0', '--no-color', base_range, '--', path).splitlines():
+                      m = re.match(r'@@ .* \+(\d+)(?:,(\d+))? @@', raw)
+                      if m:
+                          start, count = int(m.group(1)), int(m.group(2) or 1)
+                          added.update(range(start, start + count))
+                  if match is None:
+                      if status == 'A' and added and Path(path).suffix in report_suffixes and in_reported_dir(path):
+                          unreported.append(path)
+                      continue
+                  data = lines[match]
                   for n in sorted(added & data.keys()):
                       executable += 1
                       if data[n] > 0:
                           covered += 1
                       else:
                           missed.append(f'{path}:{n}')
+              if unreported:
+                  errors.append(f'new source files absent from the coverage reports: {", ".join(unreported)}')
               if executable:
                   patch_pct = 100.0 * covered / executable
                   print(f'patch {patch_pct:.1f}% ({covered}/{executable}), required {limits["PATCH"]:g}')

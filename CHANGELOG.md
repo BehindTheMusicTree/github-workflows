@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Published-package example**: `verify-public-dependency` makes a single install attempt when the run publishes no graph (`tag-graph.outputs.tag == ''`) instead of retrying for 660 s on a real failure.
 
+### Fixed
+
+- `coverage.yml` patch check: a new non-empty source file (same extension as, and in a directory of, the files in the reports) absent from the coverage reports now fails the job instead of being ignored; a changed path matching several report paths by suffix resolves to the longest match and fails when the match is ambiguous; changed paths containing spaces or non-ASCII characters are matched correctly.
+
 ## [6.3.0] - 2026-11-21
 
 
