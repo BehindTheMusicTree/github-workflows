@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `release-please.yml` arms auto-merge on the release PRs that `release-please-action` reports (`prs` output) in addition to the label listing, which can lag behind a PR opened seconds earlier and left a new release PR unarmed until the next push to `main`. A reported PR that is not an open, pending release PR from a `release-please--*` branch of the repository fails the step.
+
 ### Documentation
 
 - The release rule states that the release PR of a `release_pr` repository is auto-merged by CI when its `release-please` job sets `auto-merge: true`: agents do not merge it themselves, and never merge it directly if auto-merge is refused without the user's agreement.
