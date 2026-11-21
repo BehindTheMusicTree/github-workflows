@@ -113,6 +113,11 @@ class ReportedTests(unittest.TestCase):
         self.assertEqual(module.arm(FakeAPI(), 'token', REPO, run, self.reported(7)), [7])
         self.assertEqual(len(run.calls), 1)
 
+    def test_duplicate_reported_numbers_are_armed_once(self):
+        run = Runner()
+        self.assertEqual(module.arm(FakeAPI(issues=()), 'token', REPO, run, self.reported(7, 7)), [7])
+        self.assertEqual(len(run.calls), 1)
+
     def test_invalid_reported_pr_fails(self):
         for changes in ({'state': 'closed'}, {'base': {'ref': 'develop'}}, {'labels': []},
                         {'head': {'sha': HEAD, 'ref': 'feature/x', 'repo': {'full_name': REPO}}}):

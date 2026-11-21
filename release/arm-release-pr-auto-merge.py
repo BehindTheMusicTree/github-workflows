@@ -56,7 +56,7 @@ def reported_numbers(reported):
     numbers = [item.get('number') if isinstance(item, dict) else None for item in items] if isinstance(items, list) else None
     if numbers is None or any(type(number) is not int for number in numbers):
         raise ValueError('RELEASE_PRS must be a JSON list of objects with an integer number')
-    return numbers
+    return list(dict.fromkeys(numbers))
 
 
 def graphql(query, variables, token):
