@@ -100,7 +100,8 @@ jobs:
         run: |
           mapfile -t policies < <(grep '[^[:space:]]' <<< "$POLICIES" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
           python3 ../foundation/release/reconcile-release-prs.py "${policies[@]}"
-      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ steps.app.outputs.token }}
           config-file: ${{ inputs.config-file }}
@@ -112,4 +113,5 @@ jobs:
         working-directory: caller
         env:
           RELEASE_PR_APP_TOKEN: ${{ steps.app.outputs.token }}
+          RELEASE_PRS: ${{ steps.release.outputs.prs }}
         run: python3 ../foundation/release/arm-release-pr-auto-merge.py
