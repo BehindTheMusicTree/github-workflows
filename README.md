@@ -139,8 +139,8 @@ conditions explicitly:
   release publishes nothing in the run (`needs.tag-graph.outputs.tag == ''`), so the step
   makes a single attempt: the pinned version is already public and a failure is real.
 
-Do not add a global concurrency group: cancelling or queueing runs could drop a pending
-release bump. A registry visibility delay no longer needs a rerun (see the waits above);
+Use only the per-commit group `<stem>-${{ github.sha }}` with `cancel-in-progress: false`, as the
+example does: a ref-level group replaces a pending run and drops its release bump. A registry visibility delay no longer needs a rerun (see the waits above);
 **Re-run failed jobs** is only for a real failure. It reruns `publish-graph` and its
 dependents with the same `job.workflow_sha`, and `prepare` uploads the files it does not
 see. PyPI rejects a re-upload of an existing filename, so rerun only after the Simple page has
