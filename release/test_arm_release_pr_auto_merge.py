@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import unittest
@@ -12,7 +13,7 @@ REPO = 'owner/repo'
 
 def pull(number=7, **changes):
     return {'number': number, 'state': 'open', 'node_id': f'PR_{number}', 'title': 'chore: release main',
-            'head': {'sha': HEAD, 'ref': 'release-please--branches--main', 'repo': {'full_name': REPO}}, 'base': {'ref': 'main'}, **changes}
+            'head': {'sha': HEAD, 'ref': 'release-please--branches--main', 'repo': {'full_name': REPO}}, 'base': {'ref': 'main'}, 'labels': [{'name': module.PENDING}], **changes}
 
 
 class FakeAPI:
@@ -95,6 +96,42 @@ class ArmTests(unittest.TestCase):
         api = FakeAPI(issues=range(module.PAGE_SIZE * module.MAX_PAGES))
         with self.assertRaisesRegex(ValueError, 'Too many'):
             module.arm(api, 'token', REPO, Runner())
+
+
+class ReportedTests(unittest.TestCase):
+    @staticmethod
+    def reported(*numbers):
+        return json.dumps([{'number': n, 'title': 't'} for n in numbers])
+
+    def test_reported_pr_missing_from_the_listing_is_armed(self):
+        api, run = FakeAPI(issues=(), pulls={61: pull(61)}), Runner()
+        self.assertEqual(module.arm(api, 'token', REPO, run, self.reported(61)), [61])
+        self.assertEqual(run.calls[0][1]['id'], 'PR_61')
+
+    def test_reported_and_listed_pr_is_armed_once(self):
+        run = Runner()
+        self.assertEqual(module.arm(FakeAPI(), 'token', REPO, run, self.reported(7)), [7])
+        self.assertEqual(len(run.calls), 1)
+
+    def test_invalid_reported_pr_fails(self):
+        for changes in ({'state': 'closed'}, {'base': {'ref': 'develop'}}, {'labels': []},
+                        {'head': {'sha': HEAD, 'ref': 'feature/x', 'repo': {'full_name': REPO}}}):
+            with self.subTest(changes=changes):
+                run = Runner()
+                with self.assertRaisesRegex(ValueError, 'reported by release-please'):
+                    module.arm(FakeAPI(issues=(), pulls={7: pull(**changes)}), 'token', REPO, run, self.reported(7))
+                self.assertEqual(run.calls, [])
+
+    def test_empty_reported_keeps_the_listing_behaviour(self):
+        for reported in ('', '  ', '[]'):
+            with self.subTest(reported=reported):
+                self.assertEqual(module.arm(FakeAPI(), 'token', REPO, Runner(), reported), [7])
+
+    def test_malformed_reported_fails(self):
+        for reported in ('{', '{}', '[1]', '[{}]', '[{"number": "7"}]', '[{"number": true}]'):
+            with self.subTest(reported=reported):
+                with self.assertRaises(ValueError):
+                    module.arm(FakeAPI(), 'token', REPO, Runner(), reported)
 
 
 if __name__ == '__main__':
