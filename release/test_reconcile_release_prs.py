@@ -17,11 +17,17 @@ def pull(number=7, **changes):
             'base': {'ref': 'main'}, **changes}
 
 
+def published_release(tag, **changes):
+    return {'tag_name': tag, 'draft': False, 'prerelease': False,
+            'published_at': '2026-11-19T10:01:00Z', **changes}
+
+
 class FakeAPI:
-    def __init__(self, issues=(7,), pulls=None, tags=None, delete_error=None):
+    def __init__(self, issues=(7,), pulls=None, tags=None, delete_error=None, releases=None):
         self.issues = list(issues)
         self.pulls = pulls if pulls is not None else {7: pull()}
         self.tags = tags if tags is not None else {'v1.0.0': COMMIT, 'graph-v0.2.0': COMMIT}
+        self.releases = releases if releases is not None else {'v1.0.0': published_release('v1.0.0')}
         self.delete_error = delete_error
         self.writes = []
         self.pages = []
@@ -39,6 +45,11 @@ class FakeAPI:
             if tag not in self.tags:
                 raise module.APIError(404)
             return {'object': {'type': 'commit', 'sha': self.tags[tag]}}
+        if method == 'GET' and path.startswith('/releases/tags/'):
+            tag = path.removeprefix('/releases/tags/')
+            if tag not in self.releases:
+                raise module.APIError(404)
+            return self.releases[tag]
         self.writes.append((method, path, data))
         if method == 'DELETE' and self.delete_error:
             raise self.delete_error
@@ -56,10 +67,14 @@ def validation(releases, parents=None):
     def git(*args):
         assert args == ('rev-list', '--parents', '-n', '1', COMMIT), args
         return parents
-    return {'git': git, 'validate': validate}, calls
+    def policy_at(commit, path):
+        assert commit == COMMIT, commit
+        return {'outputs': {'github_release': path == POLICIES[0]}}
+
+    return {'git': git, 'validate': validate, 'policy_at': policy_at}, calls
 
 
-ROOT = {'.github/release-policy.json': {'release': True, 'tag': 'v1.0.0'}}
+ROOT = {'.github/release-policy.json': {'release': True, 'tag': 'v1.0.0', 'github_release': False}}
 BOTH = {**ROOT, '.github/graph-policy.json': {'release': True, 'tag': 'graph-v0.2.0'}}
 
 
@@ -69,7 +84,7 @@ class ReconcileTests(unittest.TestCase):
         with patch.dict(module.VALIDATION, patches):
             return module.reconcile(api, POLICIES), calls
 
-    def test_swaps_labels_after_every_expected_tag_exists(self):
+    def test_swaps_labels_after_every_expected_tag_and_release_exists(self):
         api = FakeAPI()
         done, calls = self.run_reconcile(api)
         self.assertEqual(done, [7])
@@ -99,6 +114,22 @@ class ReconcileTests(unittest.TestCase):
             with self.subTest(tags=tags):
                 api = FakeAPI(tags=tags)
                 with self.assertRaisesRegex(ValueError, 'graph-v0.2.0'):
+                    self.run_reconcile(api)
+                self.assertEqual(api.writes, [])
+
+    def test_tag_alone_keeps_package_release_pending_until_publication(self):
+        api = FakeAPI(releases={})
+        with self.assertRaisesRegex(ValueError, 'GitHub Release v1.0.0.*missing'):
+            self.run_reconcile(api)
+        self.assertEqual(api.writes, [])
+        api.releases['v1.0.0'] = published_release('v1.0.0')
+        self.assertEqual(self.run_reconcile(api)[0], [7])
+
+    def test_draft_or_prerelease_does_not_complete_publication(self):
+        for changes in ({'draft': True}, {'prerelease': True}, {'published_at': None}):
+            with self.subTest(changes=changes):
+                api = FakeAPI(releases={'v1.0.0': published_release('v1.0.0', **changes)})
+                with self.assertRaisesRegex(ValueError, 'published stable release'):
                     self.run_reconcile(api)
                 self.assertEqual(api.writes, [])
 
