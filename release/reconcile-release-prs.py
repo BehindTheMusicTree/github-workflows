@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mark merged release-please PRs as tagged once their release tags exist; fail closed otherwise.
+"""Mark merged release-please PRs as tagged once their declared GitHub outputs exist; fail closed otherwise.
 
 release-please runs with skip-github-release, so nothing else moves a merged release PR from
 `autorelease: pending` to `autorelease: tagged`, and it aborts every later run while one is pending.
@@ -16,6 +16,7 @@ from urllib.parse import quote
 DIRECTORY = Path(__file__).resolve().parent
 TAGGING = runpy.run_path(str(DIRECTORY / 'create-tag.py'))
 VALIDATION = runpy.run_path(str(DIRECTORY / 'validate-release.py'))
+verify_release = runpy.run_path(str(DIRECTORY / 'github-release.py'))['verify_release']
 APIError = TAGGING['APIError']
 GitHub = TAGGING['GitHub']
 BRANCH = 'main'
@@ -58,16 +59,25 @@ def reconcile(api, policy_paths):
         if not pull.get('merged_at') or pull['base']['ref'] != BRANCH:
             continue  # release-please only scans merged PRs of the target branch
         parent, commit = release_commit(pull)
-        tags = []
+        outputs = []
         for path in policy_paths:
             result = VALIDATION['validate'](parent, commit, path)
             if result['release']:
-                tags.append(result['tag'])
-        if not tags:
+                policy = VALIDATION['policy_at'](commit, path)
+                outputs.append((result['tag'], policy['outputs']['github_release']))
+        if not outputs:
             raise ValueError(f'PR #{number} carries no release intent for the given policies')
-        for tag in tags:
+        for tag, github_release in outputs:
             if TAGGING['existing_commit'](api, tag) != commit:
                 raise ValueError(f'Tag {tag} of PR #{number} is missing or targets another commit')
+            if github_release:
+                try:
+                    release = api.request('GET', '/releases/tags/' + quote(tag, safe=''))
+                except APIError as error:
+                    if error.status != 404:
+                        raise
+                    raise ValueError(f'GitHub Release {tag} of PR #{number} is missing; retry publication first') from error
+                verify_release(release, tag)
         # Add before removing: a failure in between leaves the PR pending, so a rerun retries.
         api.request('POST', f'/issues/{number}/labels', {'labels': [TAGGED]})
         try:

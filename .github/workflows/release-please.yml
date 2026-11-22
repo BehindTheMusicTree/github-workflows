@@ -10,7 +10,7 @@ on:
         type: string
         required: true
       release-policies:
-        description: Newline-separated release policy files whose tags must exist before a merged release PR is reconciled
+        description: Newline-separated release policy files whose tags and declared GitHub Releases must exist before reconciliation
         type: string
         required: true
       config-file:

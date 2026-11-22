@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep merged release PRs pending until their declared GitHub Releases are published, so overlapping pushes cannot advance to the next release during package publication.
+
 ### CI
 
 - Declare the canonical workflow-level `concurrency`: `test-actions.yml` cancels superseded PR runs; `release.yml` and the release caller examples use a per-commit group (`<stem>-${{ github.sha }}`, no cancel) so a pending run is never replaced and no release bump goes untagged (refs BehindTheMusicTree/github-config#69).
