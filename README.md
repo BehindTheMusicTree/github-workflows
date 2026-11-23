@@ -208,9 +208,11 @@ Required organization check for every repository, run on push and pull request. 
 
   | Form | `group` | `cancel-in-progress` | Applies to |
   | --- | --- | --- | --- |
-  | CI | `<stem>-${{ github.head_ref \|\| github.ref }}` | `${{ github.event_name == 'pull_request' }}` | default |
+  | CI | `<stem>-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) \|\| github.ref }}` | `${{ github.event_name == 'pull_request' }}` | default |
   | Event | `<stem>-${{ github.sha }}` | `false` | workflows whose every job calls a `release_workflows` entry of `rules.json`; `event` exemptions |
   | Queue | `<stem>-${{ github.ref }}` | `false` | `queue` exemptions (deploys, publications) |
+
+  The CI group uses the PR number for every pull request event, including `closed`, and the full ref for pushes. Org conformance also accepts `<stem>-${{ github.head_ref || github.ref }}` during the rollout. Update the checker pin before switching existing caller workflows to the new group.
 
   A workflow triggered only by `workflow_call` must not declare workflow-level concurrency: its callers do.
 
@@ -223,7 +225,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: org-conformance-${{ github.head_ref || github.ref }}
+  group: org-conformance-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

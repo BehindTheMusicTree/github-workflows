@@ -5,7 +5,7 @@
 # `<stem>` is the workflow file name without `.yml`/`.yaml`; it is used instead of `github.workflow`,
 # which holds the caller's name when the workflow runs through `workflow_call` and would collide with
 # the caller's group.
-#   CI form:      group: <stem>-${{ github.head_ref || github.ref }}
+#   CI form:      group: <stem>-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
 #                 cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 #   Event form:   group: <stem>-${{ github.sha }}
 #                 cancel-in-progress: false
@@ -21,7 +21,8 @@
 # Exemptions live in each repo's `.github/org-conformance.json`:
 #   {"concurrency": {"exemptions": [{"workflow": "deploy.yml", "form": "queue", "reason": "..."}]}}
 # Every exemption needs a reason and a form; there is no default. A missing file means no exemption.
-# Values are compared as text after YAML parsing; nothing looser is accepted. A workflow triggered
+# Values are compared as text after YAML parsing. During the rollout, the CI form also accepts
+# the legacy group <stem>-${{ github.head_ref || github.ref }}. A workflow triggered
 # only by workflow_call must not declare workflow-level concurrency: its callers do.
 # Stale (missing workflow, no push/pull_request trigger, already a release caller), duplicate or
 # reasonless exemptions and unknown keys are violations.
@@ -134,14 +135,17 @@ def release_caller: [(.jobs // {})[]] as $jobs
  | if ($w.doc | ci_triggered) then
      ([$ex[] | select(.workflow == $w.file)][0]) as $x
      | (if ($w.doc | release_caller) or ($x != null and $x.form == "event")
-      then {kind: "event", group: "\($s)-${{ github.sha }}", cancel: false}
+      then {kind: "event", groups: ["\($s)-${{ github.sha }}"], cancel: false}
       elif $x != null
-      then {kind: "queue", group: "\($s)-${{ github.ref }}", cancel: false}
-      else {kind: "CI", group: "\($s)-${{ github.head_ref || github.ref }}", cancel: "${{ github.event_name == 'pull_request' }}"} end) as $e
+      then {kind: "queue", groups: ["\($s)-${{ github.ref }}"], cancel: false}
+      else {kind: "CI",
+            groups: ["\($s)-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}",
+                     "\($s)-${{ github.head_ref || github.ref }}"],
+            cancel: "${{ github.event_name == 'pull_request' }}"} end) as $e
      | $w.doc.concurrency as $c
-     | "expected \($e.kind) form: group \($e.group | tojson), cancel-in-progress \($e.cancel | tojson)" as $want
+     | "expected \($e.kind) form: group \($e.groups[0] | tojson), cancel-in-progress \($e.cancel | tojson)" as $want
      | if $c == null then "\($w.file): no workflow-level concurrency (\($want))"
-       elif ($c | type) != "object" or $c.group != $e.group or $c["cancel-in-progress"] != $e.cancel
+       elif ($c | type) != "object" or all($e.groups[]; . != $c.group) or $c["cancel-in-progress"] != $e.cancel
        then "\($w.file): concurrency \($c | tojson) (\($want))"
        else empty end
    elif ($w.doc | triggers) == ["workflow_call"] and $w.doc.concurrency != null

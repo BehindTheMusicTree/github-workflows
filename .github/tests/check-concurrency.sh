@@ -28,8 +28,9 @@ EOF
 chmod +x "$tmp/stub.sh"
 
 failed=0
+CI_GROUP="\${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}"
 # shellcheck disable=SC2016 # literal GitHub expression
-CI_GROUP='${{ github.head_ref || github.ref }}'
+LEGACY_CI_GROUP='${{ github.head_ref || github.ref }}'
 CI_CANCEL="\${{ github.event_name == 'pull_request' }}"
 BASE_RULES='{"release_workflows":["o/w/.github/workflows/release-tag.yml"],"agent_config":{"repo":"o/a","tag":"v1","sha":"0123456789abcdef0123456789abcdef01234567"}}'
 rules() { printf '%s\n' "$1" > "$tmp/rules.json"; }
@@ -70,6 +71,24 @@ jobs: {a: {runs-on: x, steps: [{run: "true"}]}}
 EOF
 both "canonical CI form" 0 "ok   r"
 
+workflow r ci.yml <<EOF
+on: {pull_request: {}}
+concurrency:
+  group: ci-$LEGACY_CI_GROUP
+  cancel-in-progress: $CI_CANCEL
+jobs: {a: {runs-on: x, steps: [{run: "true"}]}}
+EOF
+both "legacy CI form during rollout" 0 "ok   r"
+
+workflow r ci.yml <<EOF
+on: {pull_request: {}}
+concurrency:
+  group: ci-$CI_GROUP
+  cancel-in-progress: true
+jobs: {a: {runs-on: x, steps: [{run: "true"}]}}
+EOF
+both "canonical group with unconditional cancellation" 1 "expected CI form"
+
 reset
 workflow r ci.yml <<'EOF'
 on: {push: {}}
@@ -82,10 +101,10 @@ workflow r ci.yml <<EOF
 on: {pull_request: {}}
 concurrency:
   group: \${{ github.workflow }}-$CI_GROUP
-  cancel-in-progress: true
+  cancel-in-progress: $CI_CANCEL
 jobs: {a: {runs-on: x, steps: [{run: "true"}]}}
 EOF
-both "wrong group and cancel" 1 "r: ci.yml: concurrency"
+both "wrong workflow stem" 1 "r: ci.yml: concurrency"
 
 reset
 workflow r deploy.yml <<'EOF'
