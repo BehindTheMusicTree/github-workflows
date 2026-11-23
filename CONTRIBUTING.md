@@ -178,6 +178,7 @@ Before submitting a Pull Request:
 - **Title:** Short, imperative; **always use a type prefix** (`feat:`, `fix:`, `docs:`, `chore:`), same as commit messages (e.g. `feat: add prod environment support`, `docs: document webhook vars and secrets`).
 - **Description:** What changed and why; link related issues if any.
 - **Target:** Branch should target `main`.
+- **Merge:** Pull requests are squash merged using the pull request title.
 
 After opening the PR, maintainers will review and may request changes. Once approved, a maintainer will merge.
 
