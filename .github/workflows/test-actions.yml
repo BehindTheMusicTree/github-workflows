@@ -44,6 +44,13 @@ jobs:
           persist-credentials: false
       - name: Verify compliant and divergent fixtures
         run: bash .github/tests/agent-drift.sh "$GITHUB_WORKSPACE/.agent-config-engine/scripts/check-project-agents.py"
+      # Org conformance shares this required context so adding it needs no ruleset change.
+      - name: Lint org conformance scripts
+        if: ${{ !cancelled() }}
+        run: shellcheck conformance/check-concurrency.sh .github/tests/check-concurrency.sh
+      - name: Verify workflow concurrency fixtures
+        if: ${{ !cancelled() }}
+        run: bash .github/tests/check-concurrency.sh
 
   coverage-tests:
     name: coverage workflow fixtures

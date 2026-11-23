@@ -1,0 +1,48 @@
+# Reusable workflow: organization conformance of the caller repo on push and pull_request.
+# - Agent instructions: AGENTS.md/CLAUDE.md adapters checked by the agent-config engine pinned in
+#   conformance/rules.json.
+# - Workflow concurrency: conformance/check-concurrency.sh on the caller's checkout, with the
+#   exemptions of its .github/org-conformance.json.
+# Rules and scripts are read at this workflow's own commit (job.workflow_sha), so the caller's pin
+# selects them; there is no second pin to keep in sync.
+name: Org conformance
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  org-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out caller
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          path: caller
+      - name: Check out github-workflows at this workflow's commit
+        uses: actions/checkout@v5
+        with:
+          repository: BehindTheMusicTree/github-workflows
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+          path: foundation
+      - name: Read the agent-config pin
+        id: engine
+        run: jq -er '"repo=\(.agent_config.repo)", "sha=\(.agent_config.sha)"' foundation/conformance/rules.json >>"$GITHUB_OUTPUT"
+      - name: Check out agent-config
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ steps.engine.outputs.repo }}
+          ref: ${{ steps.engine.outputs.sha }}
+          persist-credentials: false
+          path: agent-config-engine
+      - name: Agent instructions
+        run: python3 agent-config-engine/scripts/check-project-agents.py "$GITHUB_WORKSPACE/caller"
+      - name: Workflow concurrency
+        if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: foundation/conformance/check-concurrency.sh --local caller --repo "$REPO"
