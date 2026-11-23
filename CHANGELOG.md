@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.0] - 2026-11-23
+
+
 ### Added
 
 - **Org conformance** (`org-conformance.yml`): reusable required check that runs, on the caller's checkout, the agent-config engine pinned in `conformance/rules.json` (v3.6.0) and `conformance/check-concurrency.sh`, which enforces the CI, event and queue workflow-level `concurrency` forms. Exemptions move from a central list to each repository's `.github/org-conformance.json`. `check-concurrency.sh --org` runs the same rules on every repository of the organization for the weekly Enforce.
