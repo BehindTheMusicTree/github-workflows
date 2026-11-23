@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.1] - 2026-11-23
+
+
 ### Fixed
 
 - Org conformance accepts PR-number concurrency groups so workflows can prevent pull requests with the same source branch name from cancelling each other. The previous CI group remains supported during the rollout.
