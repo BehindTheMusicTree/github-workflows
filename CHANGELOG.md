@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Org conformance** (`org-conformance.yml`): reusable required check that runs, on the caller's checkout, the agent-config engine pinned in `conformance/rules.json` (v3.6.0) and `conformance/check-concurrency.sh`, which enforces the CI, event and queue workflow-level `concurrency` forms. Exemptions move from a central list to each repository's `.github/org-conformance.json`. `check-concurrency.sh --org` runs the same rules on every repository of the organization for the weekly Enforce.
+
+### Deprecated
+
+- `agent-drift.yml`: replaced by `org-conformance.yml`; it will be removed in the next major release.
+
 ### Fixed
 
 - Keep merged release PRs pending until their declared GitHub Releases are published, so overlapping pushes cannot advance to the next release during package publication.

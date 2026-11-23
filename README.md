@@ -9,6 +9,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 ## Table of Contents
 
 - [Available Workflows](#available-workflows)
+  - [Org conformance](#org-conformance)
   - [Agent drift](#agent-drift)
   - [Coverage](#coverage)
   - [Actionlint](#actionlint)
@@ -198,7 +199,59 @@ Practical notes for a workspace whose root depends on a published member:
 - A `docs:` commit is included in the changelog by release-please and opens a release PR;
   use `chore:` for a change that must not release.
 
+### Org conformance
+
+Required organization check for every repository, run on push and pull request. One job, `org-conformance`, reports two findings (both run even when the first fails):
+
+- **Agent instructions**: `AGENTS.md`/`CLAUDE.md` adapters checked by the agent-config engine pinned in [`conformance/rules.json`](conformance/rules.json) (`agent_config`).
+- **Workflow concurrency**: [`conformance/check-concurrency.sh`](conformance/check-concurrency.sh) on the caller's checkout. Every workflow triggered by `push` or `pull_request` declares workflow-level `concurrency` in one of three forms, where `<stem>` is the workflow file name without `.yml`/`.yaml`:
+
+  | Form | `group` | `cancel-in-progress` | Applies to |
+  | --- | --- | --- | --- |
+  | CI | `<stem>-${{ github.head_ref \|\| github.ref }}` | `${{ github.event_name == 'pull_request' }}` | default |
+  | Event | `<stem>-${{ github.sha }}` | `false` | workflows whose every job calls a `release_workflows` entry of `rules.json`; `event` exemptions |
+  | Queue | `<stem>-${{ github.ref }}` | `false` | `queue` exemptions (deploys, publications) |
+
+  A workflow triggered only by `workflow_call` must not declare workflow-level concurrency: its callers do.
+
+Rules and scripts are read at the reusable workflow's own commit (`job.workflow_sha`): the caller's pin selects them. Add `.github/workflows/org-conformance.yml` to the caller, pinned to the same github-workflows commit as its other calls (`release/check-workflow-pins.py` requires one commit in release-tag callers):
+
+```yaml
+name: Org conformance
+on: [push, pull_request]
+permissions:
+  contents: read
+
+concurrency:
+  group: org-conformance-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  org-conformance:
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/org-conformance.yml@<release-commit> # <release-tag>
+    permissions:
+      contents: read
+```
+
+The check context is `org-conformance / org-conformance`.
+
+Exemptions from the CI form are declared by the repository itself in `.github/org-conformance.json`, reviewed in the same pull request as the workflow they concern. A missing file means no exemption. Unknown keys, a missing `reason` or `form`, duplicates and stale entries (missing workflow, no `push`/`pull_request` trigger, already a release caller) are violations:
+
+```json
+{
+  "concurrency": {
+    "exemptions": [
+      {"workflow": "deploy.yml", "form": "queue", "reason": "Serializes deployments of a ref."}
+    ]
+  }
+}
+```
+
+`check-concurrency.sh --org` runs the same rules on the default branch of every non-archived repository (organization Enforce); `--config-only [<file>]` validates `rules.json` and an `org-conformance.json` without GitHub.
+
 ### Agent drift
+
+Deprecated: use [Org conformance](#org-conformance), which runs the same check with the current engine. Kept for existing callers until the next major release.
 
 Checks a caller project that has adopted the portable `AGENTS.md` / `CLAUDE.md` and skill-link conventions. It uses the public agent-config v1.1.0 engine pinned to commit `1e199e26e8c5d8778d94547b96d42d6c075bc7e7`, with read-only repository permissions and no private extension. It checks structure and configured scoped rules; it does not assess the accuracy of instructions or agent runtime loading.
 

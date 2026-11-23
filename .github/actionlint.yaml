@@ -12,3 +12,6 @@ paths:
   .github/workflows/release-please.yml:
     ignore:
       - 'property "workflow_(?:sha|repository)" is not defined in object type'
+  .github/workflows/org-conformance.yml:
+    ignore:
+      - 'property "workflow_(?:sha|repository)" is not defined in object type'

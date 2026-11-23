@@ -1,0 +1,13 @@
+{
+  "release_workflows": [
+    "BehindTheMusicTree/github-workflows/.github/workflows/publish-python.yml",
+    "BehindTheMusicTree/github-workflows/.github/workflows/release-github.yml",
+    "BehindTheMusicTree/github-workflows/.github/workflows/release-please.yml",
+    "BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml"
+  ],
+  "agent_config": {
+    "repo": "BehindTheMusicTree/agent-config",
+    "tag": "v3.6.0",
+    "sha": "c155f3074edc2fc25f6bce743df687aed08fc967"
+  }
+}
