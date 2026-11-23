@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Group the repository's CI runs by pull request number so pull requests with the same head branch name run independently.
+
 ## [6.4.1] - 2026-11-23
 
 
