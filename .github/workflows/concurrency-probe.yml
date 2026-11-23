@@ -1,0 +1,33 @@
+name: Concurrency probe
+
+on:
+  push:
+    branches: [chore/concurrency-67-probe]
+  pull_request:
+    branches: [chore/concurrency-67-probe]
+    types: [opened, synchronize, closed]
+
+permissions: {}
+
+concurrency:
+  group: concurrency-probe-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Record the event and resolved group
+        env:
+          ACTION: ${{ github.event.action }}
+          GROUP: concurrency-probe-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+          LEGACY_GROUP: concurrency-probe-${{ github.head_ref || github.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          printf 'event=%s action=%s pr=%s head_repo=%s head_ref=%s ref=%s group=%s legacy_group=%s\n' \
+            "$GITHUB_EVENT_NAME" "$ACTION" "$PR_NUMBER" "$PR_HEAD_REPO" "$GITHUB_HEAD_REF" "$GITHUB_REF" "$GROUP" "$LEGACY_GROUP"
+          if [[ $ACTION == opened ]]; then
+            sleep 75
+          fi
