@@ -29,8 +29,6 @@ chmod +x "$tmp/stub.sh"
 
 failed=0
 CI_GROUP="\${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}"
-# shellcheck disable=SC2016 # literal GitHub expression
-LEGACY_CI_GROUP='${{ github.head_ref || github.ref }}'
 CI_CANCEL="\${{ github.event_name == 'pull_request' }}"
 BASE_RULES='{"release_workflows":["o/w/.github/workflows/release-tag.yml"],"agent_config":{"repo":"o/a","tag":"v1","sha":"0123456789abcdef0123456789abcdef01234567"}}'
 rules() { printf '%s\n' "$1" > "$tmp/rules.json"; }
@@ -71,14 +69,14 @@ jobs: {a: {runs-on: x, steps: [{run: "true"}]}}
 EOF
 both "canonical CI form" 0 "ok   r"
 
-workflow r ci.yml <<EOF
+workflow r ci.yml <<'EOF'
 on: {pull_request: {}}
 concurrency:
-  group: ci-$LEGACY_CI_GROUP
-  cancel-in-progress: $CI_CANCEL
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs: {a: {runs-on: x, steps: [{run: "true"}]}}
 EOF
-both "legacy CI form during rollout" 0 "ok   r"
+both "legacy CI form is rejected" 1 "expected CI form"
 
 workflow r ci.yml <<EOF
 on: {pull_request: {}}

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The concurrency conformance check no longer accepts the legacy CI group `<stem>-${{ github.head_ref || github.ref }}`; only the pull-request-number form passes.
+
 ### Fixed
 
 - Group the repository's CI runs by pull request number so pull requests with the same head branch name run independently.
