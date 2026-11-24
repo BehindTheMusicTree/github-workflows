@@ -21,8 +21,7 @@
 # Exemptions live in each repo's `.github/org-conformance.json`:
 #   {"concurrency": {"exemptions": [{"workflow": "deploy.yml", "form": "queue", "reason": "..."}]}}
 # Every exemption needs a reason and a form; there is no default. A missing file means no exemption.
-# Values are compared as text after YAML parsing. During the rollout, the CI form also accepts
-# the legacy group <stem>-${{ github.head_ref || github.ref }}. A workflow triggered
+# Values are compared as text after YAML parsing. A workflow triggered
 # only by workflow_call must not declare workflow-level concurrency: its callers do.
 # Stale (missing workflow, no push/pull_request trigger, already a release caller), duplicate or
 # reasonless exemptions and unknown keys are violations.
@@ -139,8 +138,7 @@ def release_caller: [(.jobs // {})[]] as $jobs
       elif $x != null
       then {kind: "queue", groups: ["\($s)-${{ github.ref }}"], cancel: false}
       else {kind: "CI",
-            groups: ["\($s)-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}",
-                     "\($s)-${{ github.head_ref || github.ref }}"],
+            groups: ["\($s)-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}"],
             cancel: "${{ github.event_name == 'pull_request' }}"} end) as $e
      | $w.doc.concurrency as $c
      | "expected \($e.kind) form: group \($e.groups[0] | tojson), cancel-in-progress \($e.cancel | tojson)" as $want
