@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- Coverage: document the required `Tests success` gate that `needs` the tests and the `coverage` call, so a skipped coverage job fails the gate instead of passing. Refs BehindTheMusicTree/github-config#97.
+
 ## [6.6.0] - 2026-11-25
 
 
