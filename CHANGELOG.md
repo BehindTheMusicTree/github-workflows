@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `release/arm-release-pr-auto-merge.py` decides whether to merge a release PR directly from its REST `mergeable_state` (`clean`, re-read while `unknown`) instead of matching the English text of GitHub's refusal; any other state, or a moved head, fails the run.
 - `coverage.yml` resolves report paths against the repository's tracked files (exact, `<source>` roots, or a unique suffix) instead of matching only the changed files, so an ambiguous suffix outside the diff is no longer missed and one file reported under several prefixes counts once. A `.xml` file in a coverage artifact that is not valid Cobertura XML now fails the job.
 - The concurrency conformance check treats a workflow in which any job calls a release workflow as a release caller and expects the event form, so `examples/release-please-python.yml` (release jobs mixed with build and publish jobs) passes instead of being steered to a form that can lose a version bump.
 - `examples/pr-title.yml` declares the CI concurrency form and a `# Place at` header; a new CI step checks that every example passes the shipped conformance checks.

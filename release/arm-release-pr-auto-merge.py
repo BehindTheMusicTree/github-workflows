@@ -13,6 +13,7 @@ import re
 import runpy
 import subprocess
 import sys
+import time
 from urllib.parse import quote
 
 DIRECTORY = Path(__file__).resolve().parent
@@ -23,8 +24,10 @@ HEAD_PREFIX = 'release-please--'
 PENDING = 'autorelease: pending'
 PAGE_SIZE = 100
 MAX_PAGES = 5
-# GitHub refuses to arm auto-merge when nothing is left to wait for; the PR is then merged directly.
-CLEAN_STATUS = 'clean status'
+# GitHub refuses to arm auto-merge when nothing is left to wait for; the PR is then merged directly, decided
+# from the REST merge state (computed in the background, so `unknown` is read again a bounded number of times).
+STATE_READS = 5
+STATE_WAIT = 2
 MUTATION = (
     'mutation($id: ID!, $headline: String!, $oid: GitObjectID!) {'
     ' enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH,'
@@ -72,7 +75,18 @@ def release_branch(pull, repository):
     return head_repo == repository and pull['head']['ref'].startswith(HEAD_PREFIX)
 
 
-def arm(api, token, repository, run=graphql, reported=''):
+def merge_state(api, number, head, sleep):
+    for read in range(STATE_READS):
+        pull = api.request('GET', f'/pulls/{number}')
+        if pull['head']['sha'] != head:
+            raise ValueError(f'PR #{number} head moved from {head} to {pull["head"]["sha"]} while arming')
+        state = pull.get('mergeable_state')
+        if state != 'unknown' or read == STATE_READS - 1:
+            return state
+        sleep(STATE_WAIT)
+
+
+def arm(api, token, repository, run=graphql, reported='', sleep=time.sleep):
     # The issue listing can lag behind a PR release-please has just opened and labelled, so the PRs the
     # action reports are armed too; they are checked strictly because the listing's label filter is absent.
     provided = reported_numbers(reported)
@@ -91,7 +105,8 @@ def arm(api, token, repository, run=graphql, reported=''):
             raise ValueError(f'PR #{number} has no usable title or head')
         result = run(MUTATION, {'id': pull['node_id'], 'headline': title, 'oid': head}, token)
         if result.returncode != 0:
-            if CLEAN_STATUS in (result.stderr + result.stdout).lower():
+            state = merge_state(api, number, head, sleep)
+            if state == 'clean':
                 # Nothing left to wait for; the sha pin and the branch rules still gate this merge, and
                 # no later run would arm it.
                 logging.info('PR #%s is already clean: merging it directly', number)
@@ -99,7 +114,8 @@ def arm(api, token, repository, run=graphql, reported=''):
                             {'merge_method': 'squash', 'commit_title': title, 'commit_message': '', 'sha': head})
                 armed.append(number)
                 continue
-            raise ValueError(f'Cannot arm auto-merge on PR #{number}: {result.stderr.strip() or result.stdout.strip()}')
+            raise ValueError(f'Cannot arm auto-merge on PR #{number} (merge state {state}): '
+                             f'{result.stderr.strip() or result.stdout.strip()}')
         armed.append(number)
     return armed
 

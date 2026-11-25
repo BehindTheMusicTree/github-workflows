@@ -33,7 +33,10 @@ class FakeAPI:
             page = int(path.rsplit('page=', 1)[1])
             start = (page - 1) * module.PAGE_SIZE
             return [{'number': n, 'pull_request': {}} for n in self.issues[start:start + module.PAGE_SIZE]]
-        return self.pulls[int(path.rsplit('/', 1)[1])]
+        found = self.pulls[int(path.rsplit('/', 1)[1])]
+        if isinstance(found, list):
+            return found.pop(0) if len(found) > 1 else found[0]
+        return found
 
 
 class Runner:
@@ -66,12 +69,39 @@ class ArmTests(unittest.TestCase):
                 self.assertEqual(module.arm(FakeAPI(pulls={7: pull(**changes)}), 'token', REPO, run), [])
                 self.assertEqual(run.calls, [])
 
-    def test_clean_status_merges_directly_with_pinned_head(self):
-        api = FakeAPI()
-        run = Runner(1, 'Pull request is in clean status')
-        self.assertEqual(module.arm(api, 'token', REPO, run), [7])
+    def test_clean_merge_state_merges_directly_whatever_the_error_text(self):
+        api = FakeAPI(pulls={7: [pull(), pull(mergeable_state='clean')]})
+        self.assertEqual(module.arm(api, 'token', REPO, Runner(1, 'Pull request est propre')), [7])
         self.assertEqual(api.writes, [('PUT', '/pulls/7/merge', {
             'merge_method': 'squash', 'commit_title': 'chore: release main', 'commit_message': '', 'sha': HEAD})])
+
+    def test_unknown_then_clean_merge_state_retries(self):
+        api = FakeAPI(pulls={7: [pull(), pull(mergeable_state='unknown'), pull(mergeable_state='clean')]})
+        sleeps = []
+        self.assertEqual(module.arm(api, 'token', REPO, Runner(1, 'refused'), sleep=sleeps.append), [7])
+        self.assertEqual(sleeps, [module.STATE_WAIT])
+        self.assertEqual(len(api.writes), 1)
+
+    def test_blocked_merge_state_fails_closed(self):
+        api = FakeAPI(pulls={7: [pull(), pull(mergeable_state='blocked')]})
+        with self.assertRaisesRegex(ValueError, 'merge state blocked'):
+            module.arm(api, 'token', REPO, Runner(1, 'Pull request is in clean status'))
+        self.assertEqual(api.writes, [])
+
+    def test_unknown_merge_state_fails_after_bounded_reads(self):
+        api = FakeAPI(pulls={7: [pull(), pull(mergeable_state='unknown')]})
+        sleeps = []
+        with self.assertRaisesRegex(ValueError, 'merge state unknown'):
+            module.arm(api, 'token', REPO, Runner(1, 'refused'), sleep=sleeps.append)
+        self.assertEqual(len(sleeps), module.STATE_READS - 1)
+        self.assertEqual(api.writes, [])
+
+    def test_head_moved_fails(self):
+        moved = pull(mergeable_state='clean', head={'sha': 'd' * 40, 'ref': 'release-please--branches--main', 'repo': {'full_name': REPO}})
+        api = FakeAPI(pulls={7: [pull(), moved]})
+        with self.assertRaisesRegex(ValueError, 'head moved'):
+            module.arm(api, 'token', REPO, Runner(1, 'refused'))
+        self.assertEqual(api.writes, [])
 
     def test_labelled_prs_not_from_release_please_are_ignored(self):
         for head in ({'sha': HEAD, 'ref': 'feature/x', 'repo': {'full_name': REPO}},
@@ -83,8 +113,9 @@ class ArmTests(unittest.TestCase):
                 self.assertEqual(run.calls, [])
 
     def test_other_failures_fail_closed(self):
-        with self.assertRaisesRegex(ValueError, 'Cannot arm auto-merge on PR #7: boom'):
-            module.arm(FakeAPI(), 'token', REPO, Runner(1, 'boom'))
+        api = FakeAPI(pulls={7: [pull(), pull(mergeable_state='blocked')]})
+        with self.assertRaisesRegex(ValueError, r'Cannot arm auto-merge on PR #7 \(merge state blocked\): boom'):
+            module.arm(api, 'token', REPO, Runner(1, 'boom'))
 
     def test_unusable_title_or_head_fails(self):
         for changes in ({'title': ' '}, {'head': {'sha': 'abc', 'ref': 'release-please--branches--main', 'repo': {'full_name': REPO}}}):
