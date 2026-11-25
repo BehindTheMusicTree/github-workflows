@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The concurrency conformance check treats a workflow in which any job calls a release workflow as a release caller and expects the event form, so `examples/release-please-python.yml` (release jobs mixed with build and publish jobs) passes instead of being steered to a form that can lose a version bump.
+- `examples/pr-title.yml` declares the CI concurrency form and a `# Place at` header; a new CI step checks that every example passes the shipped conformance checks.
+
+### Changed
+
+- Migration: remove `form: "event"` exemptions for workflows that call a release workflow (now stale violations) when bumping the pin: grow-the-music-tree-api, agent-config-public, the-music-tree-genre-kit, release-automation-sandbox-20261106, ui, genre-tree-view, app-kit.
+
 ## [6.5.0] - 2026-11-24
 
 

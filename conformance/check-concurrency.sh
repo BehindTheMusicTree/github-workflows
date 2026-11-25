@@ -14,8 +14,9 @@
 # With a ref group, GitHub keeps one pending run and replaces it with the next one. release-tag only
 # validates `before..after` of the run it is called from, so a version bump carried by a replaced run
 # would never be tagged. The event form gives each push its own group: nothing is cancelled or
-# replaced. It applies to workflows whose every job calls one of RULES_FILE's `release_workflows`
-# (matched without the `@ref`) and to exemptions declared with `"form": "event"`. The queue form
+# replaced. It applies to workflows in which any job calls one of RULES_FILE's `release_workflows`
+# (matched without the `@ref`; the other jobs of such a workflow, builds, publications and
+# verifications, share its per-commit group) and to exemptions declared with `"form": "event"`. The queue form
 # serializes runs of a ref (deploys, publications) and applies to exemptions declared with
 # `"form": "queue"`.
 # Exemptions live in each repo's `.github/org-conformance.json`:
@@ -126,9 +127,8 @@ def triggers: (.on // .["true"] // {})
   | if type == "string" then [.] elif type == "array" then . elif type == "object" then keys else [] end;
 def ci_triggered: triggers | any(. == "push" or . == "pull_request");
 def stem: sub("\\.ya?ml$"; "");
-def release_caller: [(.jobs // {})[]] as $jobs
-  | ($jobs | length) > 0
-    and all($jobs[]; (.uses // "" | sub("@.*$"; "")) as $u | ($rules.release_workflows | index($u)) != null);
+def release_caller:
+  any((.jobs // {})[]; (.uses // "" | sub("@.*$"; "")) as $u | ($rules.release_workflows | index($u)) != null);
 ($wfs[] as $w
  | ($w.file | stem) as $s
  | if ($w.doc | ci_triggered) then

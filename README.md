@@ -209,7 +209,7 @@ Required organization check for every repository, run on push and pull request. 
   | Form | `group` | `cancel-in-progress` | Applies to |
   | --- | --- | --- | --- |
   | CI | `<stem>-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) \|\| github.ref }}` | `${{ github.event_name == 'pull_request' }}` | default |
-  | Event | `<stem>-${{ github.sha }}` | `false` | workflows whose every job calls a `release_workflows` entry of `rules.json`; `event` exemptions |
+  | Event | `<stem>-${{ github.sha }}` | `false` | workflows in which any job calls a `release_workflows` entry of `rules.json` (the other jobs share its per-commit group); `event` exemptions |
   | Queue | `<stem>-${{ github.ref }}` | `false` | `queue` exemptions (deploys, publications) |
 
   The CI group uses the PR number for every pull request event, including `closed`, and the full ref for pushes. Org conformance also accepts `<stem>-${{ github.head_ref || github.ref }}` during the rollout. Update the checker pin before switching existing caller workflows to the new group.
@@ -236,6 +236,8 @@ jobs:
 ```
 
 The check context is `org-conformance / org-conformance`.
+
+Responsibilities are split: org-conformance checks the **shape** of a repository's content (concurrency groups, agent-config pin, workflow structure) and reports it in the PR that introduces the defect; `github-config` enforces **presence** (which checks a repository must have and which ones block a merge, through `required-checks.json` and rulesets), where exemptions are central and a repository cannot exempt itself.
 
 Exemptions from the CI form are declared by the repository itself in `.github/org-conformance.json`, reviewed in the same pull request as the workflow they concern. A missing file means no exemption. Unknown keys, a missing `reason` or `form`, duplicates and stale entries (missing workflow, no `push`/`pull_request` trigger, already a release caller) are violations:
 
@@ -512,12 +514,7 @@ jobs:
 
 ### Deploy workflows (caller examples)
 
-Reference caller workflows that prepare artifacts and call the deploy reusables are in **`examples/`**:
-
-- **`examples/deploy-htmt-api-env-and-compose.yml`** — API app: prepare nginx fragment, app env files (API/DB/AFP), and compose parts; call deploy-nginx-env-fragment, deploy-app-env-file, deploy-docker-compose-part. Copy to your htmt-api repo and adapt.
-- **`examples/deploy-gtmt-front-env-and-compose.yml`** — Front app: prepare env file and compose parts; call deploy-app-env-file and deploy-docker-compose-part. Copy to your gtmt-front repo and adapt.
-
-Caller pattern: one **prepare** job uploads artifacts (use non-dotfile names for app env files); separate jobs with `needs: [prepare]` call each reusable with `secrets: inherit`. Deploy workflows run in the **caller’s** context and need the vars/secrets listed below.
+Deploy callers are not shipped as example files. Caller pattern: one **prepare** job uploads artifacts (use non-dotfile names for app env files); separate jobs with `needs: [prepare]` call each reusable with `secrets: inherit`. Deploy workflows run in the **caller’s** context and need the vars/secrets listed below.
 
 ## Required Configuration
 
