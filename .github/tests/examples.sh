@@ -20,6 +20,9 @@ RULES_FILE="$project/conformance/rules.json" "$project/conformance/check-concurr
 
 if command -v actionlint >/dev/null; then
   (cd "$tmp/examples" && actionlint -config-file "$project/.github/actionlint.yaml" .github/workflows/*.yml)
+elif [[ -n "${CI:-}" ]]; then
+  echo "FAIL: actionlint is required in CI" >&2
+  exit 1
 else
   echo "skip: actionlint not installed"
 fi
