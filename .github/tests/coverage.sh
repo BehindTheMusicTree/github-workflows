@@ -111,4 +111,11 @@ cobertura 10 10 yes; printf '<testsuites/>' > reports/junit.xml; run_check fail 
 grep -q 'not a Cobertura report' "$work/out" || { echo 'FAIL: non-Cobertura message' >&2; cat "$work/out" >&2; exit 1; }
 cobertura 10 10 yes; printf '<coverage' > reports/bad.xml; run_check fail 'invalid XML in the reports'
 grep -q 'not valid XML' "$work/out" || { echo 'FAIL: invalid XML message' >&2; cat "$work/out" >&2; exit 1; }
+scenario util.py pkg/util.py -- pkg/util.py
+multi_report util.py=1
+sed -i.bak "s|<packages>|<sources><source>$(pwd -P)/pkg</source></sources><packages>|" reports/cov.xml; rm -f reports/cov.xml.bak
+run_check pass 'source root resolves the covered file'
+multi_report util.py=0
+sed -i.bak "s|<packages>|<sources><source>$(pwd -P)/pkg</source></sources><packages>|" reports/cov.xml; rm -f reports/cov.xml.bak
+run_check fail 'source root wins over a same-named file at the root'
 echo 'all coverage tests passed'

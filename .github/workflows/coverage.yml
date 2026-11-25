@@ -87,12 +87,13 @@ jobs:
           def canonical(path, report, sources=()):
               # Map a report path onto the tracked file it names, so every later lookup is an exact match.
               p = norm(path)
-              if p in tracked:
-                  return p
+              # Cobertura filenames are relative to their <source>, so the source roots win over a same-named file at the root.
               for source in sources:
                   c = norm(os.path.join(source, path))
                   if c in tracked:
                       return c
+              if p in tracked:
+                  return p
               same_name = tracked_by_name.get(p.rsplit('/', 1)[-1], [])
               shorter = [t for t in same_name if t.endswith('/' + p)]
               if len(shorter) == 1:
