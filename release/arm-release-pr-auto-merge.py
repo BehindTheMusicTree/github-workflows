@@ -109,7 +109,8 @@ def arm(api, token, repository, run=graphql, reported='', sleep=time.sleep):
             if state == 'clean':
                 # Nothing left to wait for; the sha pin and the branch rules still gate this merge, and
                 # no later run would arm it.
-                logging.info('PR #%s is already clean: merging it directly', number)
+                logging.info('PR #%s is clean (arming refused: %s): merging it directly', number,
+                             result.stderr.strip() or result.stdout.strip())
                 api.request('PUT', f'/pulls/{number}/merge',
                             {'merge_method': 'squash', 'commit_title': title, 'commit_message': '', 'sha': head})
                 armed.append(number)
