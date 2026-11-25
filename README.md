@@ -289,12 +289,27 @@ The job fails when no report is found or when the reports hold no branch data. C
 
 Report paths are resolved against the files tracked by the repository (exact path, the Cobertura `<source>` roots, or a unique suffix match), so the same file reported under several prefixes counts once. A report path that is a suffix of several tracked files, or a `.xml` file in a `coverage-*` artifact that is not a Cobertura report (invalid XML, or a root other than `<coverage>`), fails the job: emit repository-relative paths (`relative_files = true` in coverage.py) and upload only coverage reports.
 
+A job that `needs` a test job is skipped when that job fails, and a skipped required check counts as passed. So `coverage` is not a required check itself: the caller's single required tests check (`Tests success`) is an `if: always()` gate that `needs` the test jobs **and** `coverage`, and fails when any of them is not successful. Call `coverage` without an `if`.
+
 ```yaml
 jobs:
+  tests:
+    # ... uploads coverage-* artifacts
   coverage:
     needs: [tests]
     uses: BehindTheMusicTree/github-workflows/.github/workflows/coverage.yml@<release-tag-or-commit>
+  tests-success:
+    name: Tests success
+    if: always()
+    needs: [tests, coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: jq -e 'all(.[]; .result == "success")' <<<"$NEEDS"
 ```
+
+Require `Tests success` only; the test jobs and `coverage` are declared optional in `BehindTheMusicTree/github-config`, which fails the repository when the gate does not need a job calling this workflow. A caller with a docs-only skip uses the scoped gate (`classify` job exposing `outputs.applicable`) described in that repository's README.
 
 ### Actionlint
 
