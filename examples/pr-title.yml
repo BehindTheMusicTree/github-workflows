@@ -1,3 +1,4 @@
+# Place at .github/workflows/pr-title.yml in an adopting repository.
 # Caller for the reusable PR title check. Keep it in its own workflow: the `edited` trigger
 # must not rerun the test suite. Require the check `pr-title / check` in the branch ruleset.
 name: PR title
@@ -9,6 +10,10 @@ on:
 
 permissions:
   pull-requests: read
+
+concurrency:
+  group: pr-title-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pr-title:

@@ -158,6 +158,9 @@ both "ref group on a release caller is rejected" 1 "expected event form"
 reset
 workflow r release.yml <<'EOF'
 on: {push: {}}
+concurrency:
+  group: release-${{ github.sha }}
+  cancel-in-progress: false
 jobs:
   tag:
     uses: o/w/.github/workflows/release-tag.yml@abc123
@@ -165,7 +168,38 @@ jobs:
     runs-on: x
     steps: [{run: "true"}]
 EOF
-both "mixed jobs are not a release caller" 1 "expected CI form"
+both "mixed jobs with a sha group are a release caller" 0 "ok   r"
+
+reset
+workflow r release.yml <<'EOF'
+on: {push: {}}
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  tag:
+    uses: o/w/.github/workflows/release-tag.yml@abc123
+  publish:
+    runs-on: x
+    steps: [{run: "true"}]
+EOF
+both "mixed jobs with a ref group are rejected" 1 "expected event form"
+
+reset
+workflow r release.yml <<'EOF'
+on: {push: {}}
+concurrency:
+  group: release-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  tag:
+    uses: o/w/.github/workflows/release-tag.yml@abc123
+  publish:
+    runs-on: x
+    steps: [{run: "true"}]
+EOF
+exemptions r '{"concurrency":{"exemptions":[{"workflow":"release.yml","form":"event","reason":"tags"}]}}'
+both "event exemption on a mixed release caller is stale" 1 "already a release by its uses: target"
 
 reset
 workflow r reusable.yml <<'EOF'

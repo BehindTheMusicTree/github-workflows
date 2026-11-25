@@ -194,6 +194,12 @@ Releases are made from `main`.
 
 Repositories that prepare releases with release-please (`release-please-config.json` at the root) do not edit `CHANGELOG.md` or `VERSION` in feature or release changes: use conventional PR titles, then review and merge the generated release PR. See the README section "Release preparation with release-please".
 
+#### Choosing the version
+
+- A change is **major** when a caller pinned on the previous version, changing only its pin, fails: a form removed from a conformance check, a workflow input or output removed, a validation made stricter.
+- Exception, **minor**: the caller inventory (an org search recorded in the PR) shows either no user, or that every affected caller has an identified migration to make in its bump PR. The changelog then names the migration under `Changed` ("Migration: ...").
+- Precedents: v6.5.0 (legacy CI form, 30 callers already migrated), the release carrying this rule (stale `event` exemptions in 7 repositories, removed in their bump PRs).
+
 Initial adoption keeps version 5.0.1 and creates no tag. App access and tag protections are activated separately in `github-config` before preparing a subsequent release. The reusable workflows in this repository remain pinned by consumers; this adoption does not repin them.
 
 ## License & Attribution
