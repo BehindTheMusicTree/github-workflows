@@ -99,9 +99,23 @@ scenario -- 'a*b.py';                multi_report 'a*b.py=1';           run_chec
 scenario -- ;                        : > empty.py; git add . && git commit -q -m empty; multi_report other.py=1; run_check pass 'new empty file is not flagged'
 scenario -- new.md;                  multi_report other.py=1;           run_check pass 'new non-source file is not flagged'
 scenario old.py -- old.py;           multi_report other.py=1;           run_check pass 'modified file absent from the reports is skipped'
-scenario util.py -- util.py;         multi_report api/util.py=1 web/util.py=1; run_check fail 'ambiguous suffix match'
+scenario util.py -- util.py;         multi_report api/util.py=1 web/util.py=1; run_check pass 'longer report paths collapse onto the tracked file'
+scenario pkg/a/util.py pkg/b/util.py -- pkg/a/util.py; multi_report util.py=1; run_check fail 'ambiguous suffix match against tracked files'
+grep -q 'matches several tracked files' "$work/out" || { echo 'FAIL: ambiguous suffix message' >&2; cat "$work/out" >&2; exit 1; }
+scenario pkg/a/util.py -- pkg/a/util.py; multi_report util.py=0; run_check fail 'unique suffix match resolves the changed file'
 scenario pkg/web/util.py -- pkg/web/util.py; multi_report util.py=0 web/util.py=1; run_check pass 'longest suffix match wins'
 scenario web/util.py -- web/util.py; multi_report util.py=0 web/util.py=1; run_check pass 'exact match wins over a suffix match'
 scenario 'dir é/a b.py' -- 'dir é/a b.py'; multi_report 'dir é/a b.py=0'; run_check fail 'uncovered changes in a path with spaces and non-ASCII'
 scenario 'dir é/a b.py' -- 'dir é/a b.py'; multi_report 'dir é/a b.py=1'; run_check pass 'covered changes in a path with spaces and non-ASCII'
+cobertura 10 10 yes; printf '<testsuites/>' > reports/junit.xml; run_check fail 'non-Cobertura XML in the reports'
+grep -q 'not a Cobertura report' "$work/out" || { echo 'FAIL: non-Cobertura message' >&2; cat "$work/out" >&2; exit 1; }
+cobertura 10 10 yes; printf '<coverage' > reports/bad.xml; run_check fail 'invalid XML in the reports'
+grep -q 'not valid XML' "$work/out" || { echo 'FAIL: invalid XML message' >&2; cat "$work/out" >&2; exit 1; }
+scenario util.py pkg/util.py -- pkg/util.py
+multi_report util.py=1
+sed -i.bak "s|<packages>|<sources><source>$(pwd -P)/pkg</source></sources><packages>|" reports/cov.xml; rm -f reports/cov.xml.bak
+run_check pass 'source root resolves the covered file'
+multi_report util.py=0
+sed -i.bak "s|<packages>|<sources><source>$(pwd -P)/pkg</source></sources><packages>|" reports/cov.xml; rm -f reports/cov.xml.bak
+run_check fail 'source root wins over a same-named file at the root'
 echo 'all coverage tests passed'

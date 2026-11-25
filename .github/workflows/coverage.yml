@@ -70,9 +70,40 @@ jobs:
           workspace = os.getcwd().rstrip('/') + '/'
           lines, branches = {}, {}  # file -> {line: hits}, file -> {(line, branch): taken}
 
+          def git(*args):
+              # -z and quotePath=false keep paths with spaces or non-ASCII characters verbatim.
+              return subprocess.run(['git', '--literal-pathspecs', '-c', 'core.quotePath=false', *args], capture_output=True,
+                                    text=True, encoding='utf-8', errors='replace', check=True).stdout
+
+          tracked = set(git('ls-files', '-z').split('\0')) - {''}
+          tracked_by_name = {}
+          for t in tracked:
+              tracked_by_name.setdefault(t.rsplit('/', 1)[-1], []).append(t)
+
           def norm(path):
               path = path.replace('\\', '/')
               return path[len(workspace):] if path.startswith(workspace) else path.removeprefix('./')
+
+          def canonical(path, report, sources=()):
+              # Map a report path onto the tracked file it names, so every later lookup is an exact match.
+              p = norm(path)
+              # Cobertura filenames are relative to their <source>, so the source roots win over a same-named file at the root.
+              for source in sources:
+                  c = norm(os.path.join(source, path))
+                  if c in tracked:
+                      return c
+              if p in tracked:
+                  return p
+              same_name = tracked_by_name.get(p.rsplit('/', 1)[-1], [])
+              shorter = [t for t in same_name if t.endswith('/' + p)]
+              if len(shorter) == 1:
+                  return shorter[0]
+              if shorter:
+                  errors.append(f'{report}: report path {p} matches several tracked files ({", ".join(sorted(shorter)[:5])}); '
+                                'emit repository-relative paths (coverage.py relative_files = true)')
+                  return None
+              longer = [t for t in same_name if p.endswith('/' + t)]
+              return max(longer, key=len) if longer else p
 
           def add_line(f, n, hits):
               d = lines.setdefault(f, {})
@@ -82,17 +113,12 @@ jobs:
               d = branches.setdefault(f, {})
               d[key] = d.get(key, False) or taken
 
-          def read_cobertura(path):
-              root = ET.parse(path).getroot()
+          def read_cobertura(path, root):
               sources = [s.text.strip() for s in root.iter('source') if s.text and s.text.strip()]
               for cls in root.iter('class'):
-                  name = cls.get('filename')
-                  f = norm(name)
-                  for source in sources:
-                      candidate = norm(os.path.join(source, name))
-                      if os.path.isfile(candidate):
-                          f = candidate
-                          break
+                  f = canonical(cls.get('filename'), path, sources)
+                  if f is None:
+                      continue
                   for ln in cls.iter('line'):
                       n, hits = int(ln.get('number')), int(ln.get('hits'))
                       add_line(f, n, hits)
@@ -106,7 +132,7 @@ jobs:
               f = None
               for raw in Path(path).read_text().splitlines():
                   if raw.startswith('SF:'):
-                      f = norm(raw[3:])
+                      f = canonical(raw[3:], path)
                   elif raw.startswith('DA:') and f:
                       n, hits = raw[3:].split(',')[:2]
                       add_line(f, int(n), int(hits))
@@ -117,7 +143,13 @@ jobs:
           found = 0
           for path in sorted(Path(os.environ['REPORTS_DIR']).rglob('*')):
               if path.suffix == '.xml':
-                  read_cobertura(path)
+                  try:
+                      root = ET.parse(path).getroot()
+                  except ET.ParseError as error:
+                      sys.exit(f'coverage: {path}: not valid XML ({error})')
+                  if root.tag != 'coverage':
+                      sys.exit(f'coverage: {path}: not a Cobertura report (root <{root.tag}>); upload only coverage reports in the coverage-* artifacts')
+                  read_cobertura(path, root)
               elif path.name == 'lcov.info' or path.suffix == '.lcov':
                   read_lcov(path)
               else:
@@ -143,23 +175,8 @@ jobs:
 
           base = os.environ.get('BASE_REF', '').strip()
           if base:
-              def git(*args):
-                  # -z and quotePath=false keep paths with spaces or non-ASCII characters verbatim.
-                  return subprocess.run(['git', '--literal-pathspecs', '-c', 'core.quotePath=false', *args], capture_output=True,
-                                        text=True, encoding='utf-8', errors='replace', check=True).stdout
-
               def resolve(path):
-                  if path in lines:
-                      return path
-                  candidates = [f for f in lines if f.endswith('/' + path) or path.endswith('/' + f)]
-                  if not candidates:
-                      return None
-                  best = max(min(len(f), len(path)) for f in candidates)
-                  top = [f for f in candidates if min(len(f), len(path)) == best]
-                  if len(top) > 1:
-                      errors.append(f'patch coverage: {path} matches several report paths ({", ".join(sorted(top))}); make the report paths unambiguous')
-                      return ''
-                  return top[0]
+                  return path if path in lines else None
 
               base_range = f'origin/{base}...HEAD'
               tokens = git('diff', '--name-status', '--no-renames', '-z', '--diff-filter=AM', base_range).split('\0')
@@ -174,8 +191,6 @@ jobs:
               missed, unreported = [], []
               for status, path in zip(tokens[0::2], tokens[1::2]):
                   match = resolve(path)
-                  if match == '':
-                      continue
                   added = set()
                   for raw in git('diff', '-U0', '--no-color', base_range, '--', path).splitlines():
                       m = re.match(r'@@ .* \+(\d+)(?:,(\d+))? @@', raw)

@@ -287,6 +287,8 @@ Enforces the organization coverage standard in one place: global lines ≥ 80 %,
 
 The job fails when no report is found or when the reports hold no branch data. Cobertura reports only carry per-line branch counts, so reports of sharded test runs for the same code (unit and e2e, a matrix) must be combined into one report before upload (`coverage combine`, lcov merge); otherwise the branch figure is the per-line maximum and under-reports.
 
+Report paths are resolved against the files tracked by the repository (exact path, the Cobertura `<source>` roots, or a unique suffix match), so the same file reported under several prefixes counts once. A report path that is a suffix of several tracked files, or a `.xml` file in a `coverage-*` artifact that is not a Cobertura report (invalid XML, or a root other than `<coverage>`), fails the job: emit repository-relative paths (`relative_files = true` in coverage.py) and upload only coverage reports.
+
 ```yaml
 jobs:
   coverage:
