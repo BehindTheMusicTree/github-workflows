@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.6.0] - 2026-11-25
+
+
 ### Fixed
 
 - `release/arm-release-pr-auto-merge.py` decides whether to merge a release PR directly from its REST `mergeable_state` (`clean`, re-read while `unknown`) instead of matching the English text of GitHub's refusal; any other state, or a moved head, fails the run.
