@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - Coverage: document the required `Tests success` gate that `needs` the tests and the `coverage` call, so a skipped coverage job fails the gate instead of passing. Refs BehindTheMusicTree/github-config#97.
+- Contributing: describe that CI merges the release PR of release-please callers once the required checks pass (`auto-merge: true`), instead of asking for a manual review and merge. Closes #86.
 
 ## [6.6.0] - 2026-11-25
 
