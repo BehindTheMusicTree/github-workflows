@@ -196,8 +196,9 @@ Practical notes for a workspace whose root depends on a published member:
   `dependencies`.
 - The root range must therefore be widened in the same PR as every minor bump of the
   member (a `fix:` change touching the root manifest and `uv.lock`).
-- A `docs:` commit is included in the changelog by release-please and opens a release PR;
-  use `chore:` for a change that must not release.
+- Release Please's default sections hide `docs:` commits, so a `docs:` change does not open
+  a release PR (verified against the pinned action and real docs commits); only `fix:`,
+  `feat:` and breaking changes do. Use `chore:` for any other change.
 
 ### Org conformance
 
