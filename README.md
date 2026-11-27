@@ -203,7 +203,7 @@ Practical notes for a workspace whose root depends on a published member:
 
 ### Org conformance
 
-Required organization check for every repository, run on push and pull request. One job, `org-conformance`, reports two findings (both run even when the first fails):
+Required organization check for every repository, run on push and pull request. One job, `org-conformance`, reports three findings (all run even when one fails):
 
 - **Agent instructions**: `AGENTS.md`/`CLAUDE.md` adapters checked by the agent-config engine pinned in [`conformance/rules.json`](conformance/rules.json) (`agent_config`).
 - **Workflow concurrency**: [`conformance/check-concurrency.sh`](conformance/check-concurrency.sh) on the caller's checkout. Every workflow triggered by `push` or `pull_request` declares workflow-level `concurrency` in one of three forms, where `<stem>` is the workflow file name without `.yml`/`.yaml`:
@@ -217,6 +217,7 @@ Required organization check for every repository, run on push and pull request. 
   The CI group uses the PR number for every pull request event, including `closed`, and the full ref for pushes. Org conformance also accepts `<stem>-${{ github.head_ref || github.ref }}` during the rollout. Update the checker pin before switching existing caller workflows to the new group.
 
   A workflow triggered only by `workflow_call` must not declare workflow-level concurrency: its callers do.
+- **Shared issue forms**: [`conformance/check-issue-forms.sh`](conformance/check-issue-forms.sh) on the caller's checkout. GitHub replaces the whole organization default folder when a repository has a valid local template or `config.yml` in `.github/ISSUE_TEMPLATE`, so any repository other than `.github` fails on a file there, in `ISSUE_TEMPLATE/` or `docs/ISSUE_TEMPLATE/`, or on `ISSUE_TEMPLATE.md` (root, `docs/` or `.github/`). The `.github` repository must instead keep `bug-report.yml` (type `Bug`, label `needs-triage`), `feature-request.yml` (`Feature`, `needs-triage`), `tracking-issue.yml` (`Task`, `tracking`), `follow-up-action.yml` (`Task`, `follow-up`) as valid single-document YAML forms, and a `config.yml` with `blank_issues_enabled: true`.
 
 Rules and scripts are read at the reusable workflow's own commit (`job.workflow_sha`): the caller's pin selects them. Add `.github/workflows/org-conformance.yml` to the caller, pinned to the same github-workflows commit as its other calls (`release/check-workflow-pins.py` requires one commit in release-tag callers):
 

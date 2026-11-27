@@ -47,10 +47,13 @@ jobs:
       # Org conformance shares this required context so adding it needs no ruleset change.
       - name: Lint org conformance scripts
         if: ${{ !cancelled() }}
-        run: shellcheck conformance/check-concurrency.sh .github/tests/check-concurrency.sh .github/tests/examples.sh
+        run: shellcheck conformance/check-concurrency.sh conformance/check-issue-forms.sh .github/tests/check-concurrency.sh .github/tests/check-issue-forms.sh .github/tests/examples.sh
       - name: Verify workflow concurrency fixtures
         if: ${{ !cancelled() }}
         run: bash .github/tests/check-concurrency.sh
+      - name: Verify shared issue form fixtures
+        if: ${{ !cancelled() }}
+        run: bash .github/tests/check-issue-forms.sh
       - name: Install actionlint
         if: ${{ !cancelled() }}
         run: |

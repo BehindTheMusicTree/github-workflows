@@ -46,3 +46,8 @@ jobs:
         env:
           REPO: ${{ github.event.repository.name }}
         run: foundation/conformance/check-concurrency.sh --local caller --repo "$REPO"
+      - name: Shared issue forms
+        if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: foundation/conformance/check-issue-forms.sh --local caller --repo "$REPO"
