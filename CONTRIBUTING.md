@@ -45,7 +45,6 @@ The maintainer(s) are responsible for:
 - Ensuring code quality and project direction
 - Responding to critical issues
 - Maintaining the project's infrastructure (GitHub Actions)
-- Moving "Unreleased" changelog entries to versioned sections during releases
 
 **Important:** Even maintainers must go through Pull Requests. No direct commits to `main` are allowed — all changes, including those from maintainers, must be submitted via Pull Requests and go through the standard review process.
 
@@ -60,7 +59,6 @@ The maintainer(s) are responsible for:
 
 - Propose changes to workflows, scripts, and docs via Pull Requests
 - Report issues or suggest improvements via GitHub Issues
-- Update CHANGELOG in the `[Unreleased]` section when contributing
 
 **What contributors cannot do:**
 
@@ -149,7 +147,7 @@ We use **GitHub Flow**: one main branch (`main`) and topic branches. No `develop
   - `feat: add prod environment support to redeploy webhook`
   - `docs: add webhook call vars/secrets reference`
   - `fix: handle empty variable values in config check`
-  - `chore: align changelog Unreleased`
+  - `chore: align workflow pins`
 
 ### 5. Pull Request Process
 
@@ -166,7 +164,7 @@ Before submitting a Pull Request:
 **2. Documentation**
 
 - [README.md](README.md) updated if you changed behavior or setup
-- [CHANGELOG.md](CHANGELOG.md) updated: add your changes under the `[Unreleased]` section
+- Use a conventional PR title for the generated [CHANGELOG.md](CHANGELOG.md). Release Please updates the changelog and version in the release PR.
 
 **3. Git**
 
@@ -184,15 +182,9 @@ After opening the PR, maintainers will review and may request changes. Once appr
 
 ### 6. Releasing _(For Maintainers)_
 
-Releases are made from `main`.
+Release Please prepares releases from conventional PR titles squash merged into `main`. Use `fix:` for a patch, `feat:` for a minor release, and `!` for a breaking change. Keep `CHANGELOG.md` and `VERSION` edits in the generated release PR.
 
-1. Create a feature branch from an up-to-date `main`.
-2. Run `.github/scripts/release.sh minor` (or `patch` / `major`) on the feature branch. The script updates the changelog and version and commits them without creating a tag.
-3. Push the branch, open a PR to `main`, and merge it after review and checks.
-4. CI validates the release policy, canonical `VERSION`, nonempty matching changelog notes and main ancestry. It creates an annotated tag on the exact merged commit through the release App.
-5. The tag workflow publishes the GitHub Release using those changelog notes. Rerun a failed workflow to recover; an existing release is retained. Local `publish` is refused once `.github/release-policy.json` is present.
-
-Repositories that prepare releases with release-please (`release-please-config.json` at the root) do not edit `CHANGELOG.md` or `VERSION` in feature or release changes: use conventional PR titles; the caller passes `auto-merge: true` (required by github-config), so CI merges the generated release PR once the required checks pass. See the README section "Release preparation with release-please".
+The release caller sets `auto-merge: true`. GitHub squash merges the release PR once the required checks pass. The main-push workflow validates the version and changelog, creates the annotated tag on the squash commit, and publishes the GitHub Release. Rerun the original main-push workflow to recover from a tagging or publication failure.
 
 #### Choosing the version
 
@@ -200,7 +192,7 @@ Repositories that prepare releases with release-please (`release-please-config.j
 - Exception, **minor**: the caller inventory (an org search recorded in the PR) shows either no user, or that every affected caller has an identified migration to make in its bump PR. The changelog then names the migration under `Changed` ("Migration: ...").
 - Precedents: v6.5.0 (legacy CI form, 30 callers already migrated), the release carrying this rule (stale `event` exemptions in 7 repositories, removed in their bump PRs).
 
-Initial adoption keeps version 5.0.1 and creates no tag. App access and tag protections are activated separately in `github-config` before preparing a subsequent release. The reusable workflows in this repository remain pinned by consumers; this adoption does not repin them.
+Release Please starts from v6.6.0. Consumers update their reusable workflow pins in their own repositories.
 
 ## License & Attribution
 

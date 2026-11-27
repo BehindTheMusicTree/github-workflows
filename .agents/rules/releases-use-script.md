@@ -1,6 +1,6 @@
-# Releases Must Use Script
+# Release preparation
 
-When the user asks for a "new release" (or equivalent wording), always use `.github/scripts/release.sh` from the repository root.
+This repository uses Release Please. Until its `release-please` job is activated (the pause condition in `.github/workflows/release.yml`), no release PR exists: do not release. The script procedure below applies to legacy callers without a root `release-please-config.json`.
 
 - Determine bump type (`major`, `minor`, or `patch`) from user intent.
 - If bump type is unclear, ask a single clarifying question before running the script.
@@ -16,6 +16,6 @@ Release-please repositories (a `release-please-config.json` exists at the root) 
 - If auto-merge is refused or stays blocked, never merge the release PR directly without the user's agreement.
 - The exception covers only that auto-merge. Releases made with `release.sh`, pin bumps, manual tags and other repositories keep the confirmation rule above.
 
-Examples:
+Examples for legacy script callers:
 - "new release" -> ask whether `major`, `minor`, or `patch`, then run `.github/scripts/release.sh <type>`.
 - "cut a patch release" -> run `.github/scripts/release.sh patch`.

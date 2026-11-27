@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Post-release documentation for v6.6.0](https://github.com/BehindTheMusicTree/github-workflows/compare/v6.6.0...c3ac3ea8b6c05094c8d14e47b884a150711bc768)
 
 ### Documentation
 

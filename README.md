@@ -196,8 +196,10 @@ Practical notes for a workspace whose root depends on a published member:
   `dependencies`.
 - The root range must therefore be widened in the same PR as every minor bump of the
   member (a `fix:` change touching the root manifest and `uv.lock`).
-- A `docs:` commit is included in the changelog by release-please and opens a release PR;
-  use `chore:` for a change that must not release.
+- Release Please's default sections hide `docs:` commits, so a `docs:` change does not open
+  a release PR (verified against the pinned action and real docs commits); types shown
+  in its default sections (`feat:`, `fix:`, `perf:`, `revert:`) and breaking changes do.
+  Use `chore:` for any other change.
 
 ### Org conformance
 
@@ -660,7 +662,7 @@ Before enabling a caller, configure separate tag rulesets: creation permits the 
 
 Activation and changes to the contract must land in a separate push from a version bump. Activation validates the current version, mirrors and changelog but never tags it, including an existing version with no tag. A subsequent push with no bump also produces no tag. For an established contract, a bump must increase the version and leave the policy unchanged; all mirrors and its changelog section must match. The version comparison uses the push's before/after commits, never the current branch tip. Force pushes and newly created branch events fail closed.
 
-Prepare version and changelog in a PR using the project's own tools. In this repository, `.github/scripts/release.sh major|minor|patch` prepares a commit on a feature branch. **Deprecated:** `release.sh` as a local release procedure is replaced by [release-please](#release-preparation-with-release-please) for adopters, and is refused once `release-please-config.json` exists. Its legacy `publish` command remains available to repositories without the CI policy; once `.github/release-policy.json` exists, manual publication is refused. This repository declares its own `VERSION` policy and uses pinned callers for tagging and GitHub publication. Initial adoption keeps version 5.0.1 and produces no tag; App access and protections are activated separately in `github-config`.
+This repository uses [Release Please](#release-preparation-with-release-please) to prepare changes to its `VERSION` and changelog. Its pinned release workflow tags and publishes GitHub Releases. For consumers that still prepare releases with the legacy script, `.github/scripts/release.sh major|minor|patch` prepares a commit on a feature branch. The script refuses once `release-please-config.json` exists. Its legacy `publish` command is available only to repositories without `.github/release-policy.json`.
 
 Validation runs without App secrets and checks ancestry against fetched `origin/main`. A separate runner checks out only this repository's shared implementation at an immutable SHA, checks configuration, then requests an App token scoped to the caller repository and Contents write. The App-token action revokes it in its post step. No caller script or build runs in that job. The helper checkouts use `job.workflow_sha`, the commit of this reusable workflow that the caller pinned, after a guard step requires a 40-hex SHA and `job.workflow_repository` equal to `BehindTheMusicTree/github-workflows`. Scripts therefore always match the reviewed workflow and a Python change needs no second self-pin; each caller still pins the outer workflow independently.
 
