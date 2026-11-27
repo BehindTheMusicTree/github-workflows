@@ -197,8 +197,9 @@ Practical notes for a workspace whose root depends on a published member:
 - The root range must therefore be widened in the same PR as every minor bump of the
   member (a `fix:` change touching the root manifest and `uv.lock`).
 - Release Please's default sections hide `docs:` commits, so a `docs:` change does not open
-  a release PR (verified against the pinned action and real docs commits); only `fix:`,
-  `feat:` and breaking changes do. Use `chore:` for any other change.
+  a release PR (verified against the pinned action and real docs commits); types shown
+  in its default sections (`feat:`, `fix:`, `perf:`, `revert:`) and breaking changes do.
+  Use `chore:` for any other change.
 
 ### Org conformance
 
