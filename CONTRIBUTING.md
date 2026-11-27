@@ -182,6 +182,8 @@ After opening the PR, maintainers will review and may request changes. Once appr
 
 ### 6. Releasing _(For Maintainers)_
 
+Until the `release-please` job in `.github/workflows/release.yml` is activated (its pause condition removed), no release PR exists and no release can be cut.
+
 Release Please prepares releases from conventional PR titles squash merged into `main`. Use `fix:` for a patch, `feat:` for a minor release, and `!` for a breaking change. Keep `CHANGELOG.md` and `VERSION` edits in the generated release PR.
 
 The release caller sets `auto-merge: true`. GitHub squash merges the release PR once the required checks pass. The main-push workflow validates the version and changelog, creates the annotated tag on the squash commit, and publishes the GitHub Release. Rerun the original main-push workflow to recover from a tagging or publication failure.

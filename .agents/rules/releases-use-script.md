@@ -1,6 +1,6 @@
 # Release preparation
 
-This repository uses Release Please. Until its `release-please` job is activated (the pause condition in `.github/workflows/release.yml`), no release PR exists: do not release. The script procedure below applies to legacy callers without a root `release-please-config.json`.
+This repository uses Release Please. The script procedure below applies to legacy callers without a root `release-please-config.json`.
 
 - Determine bump type (`major`, `minor`, or `patch`) from user intent.
 - If bump type is unclear, ask a single clarifying question before running the script.
