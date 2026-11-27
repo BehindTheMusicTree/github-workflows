@@ -192,7 +192,7 @@ Releases are made from `main`.
 4. CI validates the release policy, canonical `VERSION`, nonempty matching changelog notes and main ancestry. It creates an annotated tag on the exact merged commit through the release App.
 5. The tag workflow publishes the GitHub Release using those changelog notes. Rerun a failed workflow to recover; an existing release is retained. Local `publish` is refused once `.github/release-policy.json` is present.
 
-Repositories that prepare releases with release-please (`release-please-config.json` at the root) do not edit `CHANGELOG.md` or `VERSION` in feature or release changes: use conventional PR titles, then review and merge the generated release PR. See the README section "Release preparation with release-please".
+Repositories that prepare releases with release-please (`release-please-config.json` at the root) do not edit `CHANGELOG.md` or `VERSION` in feature or release changes: use conventional PR titles; the caller passes `auto-merge: true` (required by github-config), so CI merges the generated release PR once the required checks pass. See the README section "Release preparation with release-please".
 
 #### Choosing the version
 
