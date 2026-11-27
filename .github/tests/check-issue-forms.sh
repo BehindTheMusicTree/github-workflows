@@ -83,6 +83,15 @@ run_case "docs single template overrides" 1 "docs/ISSUE_TEMPLATE.md" r
 reset; mkdir -p "$tmp/fx/docs/ISSUE_TEMPLATE"; printf '# t\n' > "$tmp/fx/docs/ISSUE_TEMPLATE/a.md"
 run_case "docs template directory overrides" 1 "docs/ISSUE_TEMPLATE/a.md" r
 
+reset; printf '# t\n' > "$tmp/fx/ISSUE_TEMPLATE.md"
+run_case "root single template overrides" 1 "ISSUE_TEMPLATE.md" r
+
+reset; mkdir -p "$tmp/fx/ISSUE_TEMPLATE"; printf '# t\n' > "$tmp/fx/ISSUE_TEMPLATE/a.md"
+run_case "root template directory overrides" 1 "ISSUE_TEMPLATE/a.md" r
+
+reset; printf 'x\n' > "$tmp/fx/.github/ISSUE_TEMPLATE/notes.txt"
+run_case "any file in the template folder overrides" 1 "notes.txt" r
+
 reset; mkdir -p "$tmp/fx/.github/workflows"; printf 'on: push\n' > "$tmp/fx/.github/workflows/ci.yml"
 run_case "unrelated files are ignored" 0 "ok   r" r
 

@@ -30,10 +30,12 @@ FORMS
     echo 'FAIL config.yml: blank issues must be enabled'; errors=1
   fi
 else
-  while IFS= read -r -d '' path; do
-    echo "FAIL ${path#"$root"/}: local issue template or configuration overrides shared forms"
+  found=$(cd "$root" && find . -maxdepth 4 \( -type f -o -type l \) \( -ipath './.github/ISSUE_TEMPLATE/*' -o -ipath './ISSUE_TEMPLATE/*.md' -o -ipath './docs/ISSUE_TEMPLATE/*.md' -o -ipath './ISSUE_TEMPLATE.md' -o -ipath './.github/ISSUE_TEMPLATE.md' -o -ipath './docs/ISSUE_TEMPLATE.md' \) -print) || { echo 'FAIL: cannot scan the checkout for local issue templates' >&2; exit 2; }
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    echo "FAIL ${path#./}: local issue template or configuration overrides shared forms"
     errors=1
-  done < <(find "$root" -maxdepth 4 -type f \( -ipath "$root/.github/ISSUE_TEMPLATE/*.md" -o -ipath "$root/.github/ISSUE_TEMPLATE/*.yml" -o -ipath "$root/.github/ISSUE_TEMPLATE/*.yaml" -o -ipath "$root/ISSUE_TEMPLATE/*.md" -o -ipath "$root/docs/ISSUE_TEMPLATE/*.md" -o -ipath "$root/ISSUE_TEMPLATE.md" -o -ipath "$root/.github/ISSUE_TEMPLATE.md" -o -ipath "$root/docs/ISSUE_TEMPLATE.md" \) -print0)
+  done <<<"$found"
 fi
 if (( errors )); then exit 1; fi
 echo "ok   $repo: issue forms"

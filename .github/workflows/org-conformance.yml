@@ -3,6 +3,7 @@
 #   conformance/rules.json.
 # - Workflow concurrency: conformance/check-concurrency.sh on the caller's checkout, with the
 #   exemptions of its .github/org-conformance.json.
+# - Shared issue forms: conformance/check-issue-forms.sh; only .github keeps issue templates.
 # Rules and scripts are read at this workflow's own commit (job.workflow_sha), so the caller's pin
 # selects them; there is no second pin to keep in sync.
 name: Org conformance
