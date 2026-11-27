@@ -92,6 +92,12 @@ run_case "root template directory overrides" 1 "ISSUE_TEMPLATE/a.md" r
 reset; printf 'x\n' > "$tmp/fx/.github/ISSUE_TEMPLATE/notes.txt"
 run_case "any file in the template folder overrides" 1 "notes.txt" r
 
+reset; mkdir -p "$tmp/fx/.github/ISSUE_TEMPLATE/sub"; printf 'x\n' > "$tmp/fx/.github/ISSUE_TEMPLATE/sub/a.md"
+run_case "nested template overrides" 1 "sub/a.md" r
+
+reset; ln -s /nonexistent "$tmp/fx/.github/ISSUE_TEMPLATE/link.yml"
+run_case "symlinked template overrides" 1 "link.yml" r
+
 reset; mkdir -p "$tmp/fx/.github/workflows"; printf 'on: push\n' > "$tmp/fx/.github/workflows/ci.yml"
 run_case "unrelated files are ignored" 0 "ok   r" r
 

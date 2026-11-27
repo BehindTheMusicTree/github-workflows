@@ -30,7 +30,7 @@ FORMS
     echo 'FAIL config.yml: blank issues must be enabled'; errors=1
   fi
 else
-  found=$(cd "$root" && find . -maxdepth 4 \( -type f -o -type l \) \( -ipath './.github/ISSUE_TEMPLATE/*' -o -ipath './ISSUE_TEMPLATE/*.md' -o -ipath './docs/ISSUE_TEMPLATE/*.md' -o -ipath './ISSUE_TEMPLATE.md' -o -ipath './.github/ISSUE_TEMPLATE.md' -o -ipath './docs/ISSUE_TEMPLATE.md' \) -print) || { echo 'FAIL: cannot scan the checkout for local issue templates' >&2; exit 2; }
+  found=$(cd -- "$root" && find . -maxdepth 4 \( -type f -o -type l \) \( -ipath './.github/ISSUE_TEMPLATE/*' -o -ipath './ISSUE_TEMPLATE/*.md' -o -ipath './docs/ISSUE_TEMPLATE/*.md' -o -ipath './ISSUE_TEMPLATE.md' -o -ipath './.github/ISSUE_TEMPLATE.md' -o -ipath './docs/ISSUE_TEMPLATE.md' \) -print) || { echo 'FAIL: cannot scan the checkout for local issue templates' >&2; exit 2; }
   while IFS= read -r path; do
     [[ -n "$path" ]] || continue
     echo "FAIL ${path#./}: local issue template or configuration overrides shared forms"
