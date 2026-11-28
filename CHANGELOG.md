@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.7.1](https://github.com/BehindTheMusicTree/github-workflows/compare/v6.7.0...v6.7.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* bound GitHub Actions job execution time ([#99](https://github.com/BehindTheMusicTree/github-workflows/issues/99)) ([892a2ad](https://github.com/BehindTheMusicTree/github-workflows/commit/892a2add1888b1f6f28e26115d24b5b0bc11fcb6))
+
 ## [6.7.0](https://github.com/BehindTheMusicTree/github-workflows/compare/v6.6.0...v6.7.0) (2026-11-27)
 
 
