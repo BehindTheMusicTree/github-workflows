@@ -51,6 +51,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.release.outputs.version }}
       foundation-sha: ${{ steps.foundation.outputs.sha }}

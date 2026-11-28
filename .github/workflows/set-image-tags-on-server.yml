@@ -32,6 +32,7 @@ jobs:
   set-tags:
     name: Set image tags manifest on server
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     env:
       SSH_DESTINATION: ${{ secrets.SERVER_DEPLOY_USERNAME }}@${{ vars.DEPLOY_SSH_HOST }}
     steps:
