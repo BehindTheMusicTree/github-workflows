@@ -13,6 +13,7 @@ jobs:
   trigger-coolify-deploy-tests:
     name: trigger-coolify-deploy shell tests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
 
@@ -25,6 +26,7 @@ jobs:
   check-api-version-tests:
     name: check-api-version shell tests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
 
@@ -34,6 +36,7 @@ jobs:
   agent-drift-tests:
     name: agent drift fixture
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
       - uses: actions/checkout@v5
@@ -67,6 +70,7 @@ jobs:
   coverage-tests:
     name: coverage workflow fixtures
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
       - name: Verify thresholds, missing data and patch coverage
@@ -75,6 +79,7 @@ jobs:
   release-script-tests:
     name: release script tests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
       - name: Verify prepare and publish
@@ -83,6 +88,7 @@ jobs:
   release-foundation-tests:
     name: release foundation tests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:

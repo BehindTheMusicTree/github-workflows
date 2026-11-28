@@ -9,6 +9,7 @@ permissions:
 jobs:
   agent-drift:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check out caller
         uses: actions/checkout@v5

@@ -40,6 +40,9 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## Available Workflows
 
+Runner jobs in the reusable workflows have a five-minute limit per job. Each
+caller uses the limits defined by the workflow revision it references.
+
 ### Python publication
 
 [`publish-python.yml`](.github/workflows/publish-python.yml) builds exactly one wheel and

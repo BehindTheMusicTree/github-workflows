@@ -38,6 +38,7 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     # A superseded run is harmless: release-please recomputes everything from the main HEAD.
     concurrency:
       group: release-please-${{ github.repository }}

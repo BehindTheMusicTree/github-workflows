@@ -65,6 +65,7 @@ jobs:
   validate-env:
     name: Validate env
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       env_normalized: ${{ steps.normalize.outputs.env_normalized }}
       hook_id_base_effective: ${{ steps.normalize.outputs.hook_id_base_effective }}
@@ -95,6 +96,7 @@ jobs:
   check-required-config:
     name: Check required vars and secrets
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [validate-env]
     environment:
       name: ${{ needs.validate-env.outputs.env_normalized }}
@@ -158,6 +160,7 @@ jobs:
   call_webhook:
     name: Call Redeploy Webhook
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [check-required-config, validate-env]
     environment:
       name: ${{ needs.validate-env.outputs.env_normalized }}

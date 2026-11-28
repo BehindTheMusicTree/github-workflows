@@ -28,6 +28,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       release: ${{ steps.intent.outputs.release }}
       tag: ${{ steps.intent.outputs.tag }}
@@ -82,6 +83,7 @@ jobs:
     needs: validate
     if: needs.validate.outputs.release == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     # Each event is independent: callers use a per-commit group (`<stem>-${{ github.sha }}`, no cancel); a ref-level group replaces a pending run and drops its bump.
     steps:
       - name: Require the caller-pinned workflow commit
@@ -125,6 +127,7 @@ jobs:
     needs: [validate, tag]
     if: needs.validate.outputs.github-release == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
