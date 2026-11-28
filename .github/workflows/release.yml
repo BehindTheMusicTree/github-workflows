@@ -15,7 +15,7 @@ jobs:
   release-tag:
     permissions:
       contents: write
-    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@18b90bc9c64b9abab0a86e7ea74f65acac93aec1
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-tag.yml@d2fa2ae24bb974bbb8c97a83a02b2325d4977d33
     with:
       app-id: ${{ vars.RELEASE_APP_ID }}
     secrets:
@@ -23,7 +23,7 @@ jobs:
 
   release-please:
     needs: release-tag
-    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-please.yml@18b90bc9c64b9abab0a86e7ea74f65acac93aec1
+    uses: BehindTheMusicTree/github-workflows/.github/workflows/release-please.yml@d2fa2ae24bb974bbb8c97a83a02b2325d4977d33
     with:
       app-id: ${{ vars.RELEASE_PR_APP_ID }}
       release-policies: .github/release-policy.json
